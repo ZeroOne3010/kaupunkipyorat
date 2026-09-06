@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Helsinki city-bike flows</title>
+  <link href="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.css" rel="stylesheet">
+  <link href="style.css" rel="stylesheet">
+</head>
+<body>
+  <div id="map" aria-label="Map of Helsinki city-bike trips"></div>
+  <section class="panel" aria-label="Map controls">
+    <h1>City-bike flows</h1>
+    <div id="dataset">Loading data…</div>
+    <fieldset><legend>Time</legend>
+      <label><input type="radio" name="mode" value="month" checked> Month</label>
+      <label><input type="radio" name="mode" value="day"> Day</label>
+      <label><input type="radio" name="mode" value="hour"> Hour</label>
+    </fieldset>
+    <label id="day-control" hidden>Day <select id="day"></select></label>
+    <label id="hour-control" hidden>Hour <input id="hour" type="range" min="0" value="0"><output id="hour-label"></output></label>
+    <fieldset><legend>Direction</legend>
+      <label><input type="radio" name="direction" value="outgoing"> Outgoing</label>
+      <label><input type="radio" name="direction" value="incoming"> Incoming</label>
+      <label><input type="radio" name="direction" value="both" checked> Both</label>
+    </fieldset>
+    <p><strong id="station">All stations</strong><br><span id="rides">—</span></p>
+    <button id="clear" type="button" hidden>Clear station</button>
+    <p class="hint">Select a station to inspect its trips.</p>
+  </section>
+  <script src="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+name: Build monthly data
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: URL of an HSL monthly CSV or ZIP
+        required: true
+        type: string
+      output_filename:
+        description: JSON filename (without a path)
+        required: false
+        default: sample-month.json
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  preprocess:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate output filename
+        env:
+          OUTPUT_FILENAME: ${{ inputs.output_filename }}
+        run: |
+          [[ "$OUTPUT_FILENAME" =~ ^[A-Za-z0-9._-]+\.json$ ]] || {
+            echo "Output filename must be a plain .json filename" >&2
+            exit 1
+          }
+      - name: Download source data
+        env:
+          SOURCE_URL: ${{ inputs.source_url }}
+        run: curl --fail --location --retry 3 --output /tmp/hsl-month "$SOURCE_URL"
+      - name: Build compact JSON
+        env:
+          OUTPUT_FILENAME: ${{ inputs.output_filename }}
+        run: python preprocess/build-data.py /tmp/hsl-month "output/$OUTPUT_FILENAME"
+      - name: Sanity-check output
+        env:
+          OUTPUT_FILENAME: ${{ inputs.output_filename }}
+        run: |
+          python - "$OUTPUT_FILENAME" <<'PY'
+          import json, pathlib, sys
+          data = json.loads((pathlib.Path("output") / sys.argv[1]).read_text())
+          assert data["v"] == 1 and 1 <= data["m"] <= 12
+          assert data["total"] and sum(row[2] for row in data["total"]) > 0
+          assert len(data["d"]) in (28, 29, 30, 31)
+          assert len(data["h"]) == len(data["d"]) * 24
+          assert all(len(row) == 5 for group in [data["total"], *data["d"], *data["h"]] for row in group)
+          print("JSON structure is valid")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hsl-city-bike-json
+          path: output/${{ inputs.output_filename }}
+          if-no-files-found: error
