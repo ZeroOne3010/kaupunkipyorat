@@ -16,6 +16,7 @@ const STATIONS = [
 const stationById = new Map(STATIONS.map(([id, name, lat, lon]) => [id, {id, name, lat, lon}]));
 let data;
 let selectedId = null;
+let dataRequestId = 0;
 
 const map = new maplibregl.Map({
   container: "map",
@@ -77,9 +78,19 @@ function updateHourLabel() {
 }
 
 async function loadData(dataFile) {
-  const response = await fetch(`data/${dataFile}`);
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-  data = await response.json();
+  const requestId = ++dataRequestId;
+  let loadedData;
+  try {
+    const response = await fetch(`data/${dataFile}`);
+    if (requestId !== dataRequestId) return;
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    loadedData = await response.json();
+    if (requestId !== dataRequestId) return;
+  } catch (error) {
+    if (requestId !== dataRequestId) return;
+    throw error;
+  }
+  data = loadedData;
   selectedId = null;
   const day = document.querySelector("#day");
   day.replaceChildren(...data.d.map((_, index) => new Option(`${index + 1}.${data.m}.${data.y}`, index)));

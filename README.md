@@ -11,7 +11,9 @@ HSL monthly `.csv` or `.zip`, and optionally set the JSON filename. When left
 blank, the filename is derived from the URL, so `2025-04.csv` produces
 `2025-04.json`. The job downloads the source, runs `preprocess/build-data.py`,
 validates the result, and creates the `hsl-city-bike-json` artifact. It never
-commits to the repository.
+commits to the repository. The names `months.json` and `sample-month.json` are
+reserved for the generated index and synthetic demo data and cannot be used as
+workflow output filenames.
 
 Download and unzip that artifact from the workflow run summary, then put the JSON
 in `site/data/` and commit it. During deployment, the Pages workflow discovers all

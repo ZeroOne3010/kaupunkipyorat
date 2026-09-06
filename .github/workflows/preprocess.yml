@@ -39,6 +39,10 @@ jobs:
             echo "Output filename must be a plain .json filename" >&2
             exit 1
           }
+          [[ "$OUTPUT_FILENAME" != "months.json" && "$OUTPUT_FILENAME" != "sample-month.json" ]] || {
+            echo "Output filename '$OUTPUT_FILENAME' is reserved by the site" >&2
+            exit 1
+          }
           echo "output_filename=$OUTPUT_FILENAME" >> "$GITHUB_OUTPUT"
       - name: Download source data
         env:
