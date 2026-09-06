@@ -8,9 +8,8 @@ on:
         required: true
         type: string
       output_filename:
-        description: JSON filename (without a path)
+        description: JSON filename (without a path); defaults to the source filename with a .json extension
         required: false
-        default: sample-month.json
         type: string
 
 permissions:
@@ -24,25 +23,38 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Validate output filename
+      - name: Resolve and validate output filename
+        id: filename
         env:
-          OUTPUT_FILENAME: ${{ inputs.output_filename }}
+          REQUESTED_OUTPUT_FILENAME: ${{ inputs.output_filename }}
+          SOURCE_URL: ${{ inputs.source_url }}
         run: |
+          OUTPUT_FILENAME="$REQUESTED_OUTPUT_FILENAME"
+          if [[ -z "$OUTPUT_FILENAME" ]]; then
+            source_filename="${SOURCE_URL%%[?#]*}"
+            source_filename="${source_filename##*/}"
+            OUTPUT_FILENAME="${source_filename%.*}.json"
+          fi
           [[ "$OUTPUT_FILENAME" =~ ^[A-Za-z0-9._-]+\.json$ ]] || {
             echo "Output filename must be a plain .json filename" >&2
             exit 1
           }
+          [[ "$OUTPUT_FILENAME" != "months.json" && "$OUTPUT_FILENAME" != "sample-month.json" ]] || {
+            echo "Output filename '$OUTPUT_FILENAME' is reserved by the site" >&2
+            exit 1
+          }
+          echo "output_filename=$OUTPUT_FILENAME" >> "$GITHUB_OUTPUT"
       - name: Download source data
         env:
           SOURCE_URL: ${{ inputs.source_url }}
         run: curl --fail --location --retry 3 --output /tmp/hsl-month "$SOURCE_URL"
       - name: Build compact JSON
         env:
-          OUTPUT_FILENAME: ${{ inputs.output_filename }}
+          OUTPUT_FILENAME: ${{ steps.filename.outputs.output_filename }}
         run: python preprocess/build-data.py /tmp/hsl-month "output/$OUTPUT_FILENAME"
       - name: Sanity-check output
         env:
-          OUTPUT_FILENAME: ${{ inputs.output_filename }}
+          OUTPUT_FILENAME: ${{ steps.filename.outputs.output_filename }}
         run: |
           python - "$OUTPUT_FILENAME" <<'PY'
           import json, pathlib, sys
@@ -57,5 +69,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: hsl-city-bike-json
-          path: output/${{ inputs.output_filename }}
+          path: output/${{ steps.filename.outputs.output_filename }}
           if-no-files-found: error
