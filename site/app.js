@@ -1,4 +1,3 @@
-const DATA_FILE = "data/sample-month.json";
 const MIN_RIDE_COUNT = 1;
 
 // IDs and positions from HSL's city-bike GBFS station feed (see README).
@@ -77,6 +76,20 @@ function updateHourLabel() {
   document.querySelector("#hour-label").textContent = new Intl.DateTimeFormat(undefined, {day: "numeric", month: "short", hour: "2-digit", timeZone: "UTC"}).format(date);
 }
 
+async function loadData(dataFile) {
+  const response = await fetch(`data/${dataFile}`);
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  data = await response.json();
+  selectedId = null;
+  const day = document.querySelector("#day");
+  day.replaceChildren(...data.d.map((_, index) => new Option(`${index + 1}.${data.m}.${data.y}`, index)));
+  const hour = document.querySelector("#hour");
+  hour.max = data.h.length - 1;
+  hour.value = 0;
+  updateHourLabel();
+  update();
+}
+
 map.on("load", async () => {
   map.addSource("flows", {type: "geojson", data: {type: "FeatureCollection", features: []}});
   map.addLayer({id: "flows", type: "line", source: "flows", paint: {
@@ -91,16 +104,19 @@ map.on("load", async () => {
   map.on("mouseenter", "stations", () => { map.getCanvas().style.cursor = "pointer"; });
   map.on("mouseleave", "stations", () => { map.getCanvas().style.cursor = ""; });
   try {
-    const response = await fetch(DATA_FILE);
+    const response = await fetch("data/months.json");
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    data = await response.json();
-    document.querySelector("#dataset").textContent = `${data.y}-${String(data.m).padStart(2, "0")}`;
-    const day = document.querySelector("#day");
-    data.d.forEach((_, index) => day.add(new Option(`${index + 1}.${data.m}.${data.y}`, index)));
-    document.querySelector("#hour").max = data.h.length - 1;
-    update();
+    const months = await response.json();
+    if (!months.length) throw new Error("no monthly data is available");
+    const dataset = document.querySelector("#dataset");
+    dataset.replaceChildren(...months.map(month => new Option(
+      `${month.year}-${String(month.month).padStart(2, "0")}`,
+      month.file
+    )));
+    dataset.value = months.at(-1).file;
+    await loadData(dataset.value);
   } catch (error) {
-    document.querySelector("#dataset").textContent = `Could not load ${DATA_FILE}: ${error.message}`;
+    document.querySelector("#dataset").replaceChildren(new Option(`Could not load data: ${error.message}`));
   }
 });
 
@@ -109,3 +125,10 @@ document.querySelectorAll('input[name="direction"]').forEach(input => input.addE
 document.querySelector("#day").addEventListener("change", update);
 document.querySelector("#hour").addEventListener("input", () => { updateHourLabel(); update(); });
 document.querySelector("#clear").addEventListener("click", () => { selectedId = null; update(); });
+document.querySelector("#dataset").addEventListener("change", async event => {
+  try {
+    await loadData(event.target.value);
+  } catch (error) {
+    window.alert(`Could not load data/${event.target.value}: ${error.message}`);
+  }
+});

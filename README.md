@@ -7,18 +7,23 @@ flows. There is no backend or frontend build step.
 ## Build a month
 
 Run **Actions → Build monthly data → Run workflow**, paste the public URL of an
-HSL monthly `.csv` or `.zip`, and optionally change the JSON filename. The job
-downloads the source, runs `preprocess/build-data.py`, validates the result, and
-creates the `hsl-city-bike-json` artifact. It never commits to the repository.
+HSL monthly `.csv` or `.zip`, and optionally set the JSON filename. When left
+blank, the filename is derived from the URL, so `2025-04.csv` produces
+`2025-04.json`. The job downloads the source, runs `preprocess/build-data.py`,
+validates the result, and creates the `hsl-city-bike-json` artifact. It never
+commits to the repository.
 
 Download and unzip that artifact from the workflow run summary, then put the JSON
-in `site/data/`. Set `DATA_FILE` near the top of `site/app.js` to its path relative
-to `site/` (for example, `data/2025-07.json`) and commit it.
+in `site/data/` and commit it. During deployment, the Pages workflow discovers all
+monthly JSON files (excluding the synthetic sample), builds a month index, and the
+site makes every indexed month available in its month selector. The newest month
+is selected by default, so no application code needs to change when data is added.
 
 For local use:
 
 ```sh
 python preprocess/build-data.py month.zip site/data/sample-month.json
+python preprocess/build-data-index.py site/data
 python -m http.server --directory site 8000
 ```
 
