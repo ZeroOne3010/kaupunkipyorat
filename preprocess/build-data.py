@@ -18,7 +18,15 @@ ALIASES = {
     "departure": ("departure", "departuretime", "lahtoaika", "lahtopvm"),
     "origin": ("departurestationid", "originstationid", "lahtoasemanid", "lahtoasematunnus", "lahtoasemaid"),
     "destination": ("returnstationid", "destinationstationid", "palautusasemanid", "palautusasemantunnus", "palautusasemaid"),
-    "duration": ("durationsec", "durationseconds", "duration", "kestosec", "kestosekuntia", "matkankestosek"),
+    "duration": (
+        "durationsec",
+        "durationseconds",
+        "duration",
+        "kestosec",
+        "kestosekuntia",
+        "matkankestosek",
+        "matkankestos",
+    ),
     "distance": ("covereddistancem", "distancem", "distance", "etaisyysm", "matkam", "matkanpituusm"),
 }
 
@@ -107,14 +115,14 @@ def build(source):
             try:
                 departure = parse_time(row[columns["departure"]])
                 current_month = (departure.year, departure.month)
-                if month is None:
-                    month = current_month
-                if current_month != month:
-                    raise ValueError(f"date is outside detected {month[0]:04d}-{month[1]:02d}")
                 origin = integer(row[columns["origin"]], "origin station ID")
                 destination = integer(row[columns["destination"]], "destination station ID")
                 duration = integer(row.get(columns["duration"]) if columns["duration"] else "", "duration", True)
                 distance = integer(row.get(columns["distance"]) if columns["distance"] else "", "distance", True)
+                if month is None:
+                    month = current_month
+                elif current_month != month:
+                    raise ValueError(f"date is outside detected {month[0]:04d}-{month[1]:02d}")
                 key = (origin, destination)
                 add(total, key, duration, distance)
                 add(days[departure.day - 1], key, duration, distance)

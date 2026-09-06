@@ -48,6 +48,7 @@ jobs:
           import json, pathlib, sys
           data = json.loads((pathlib.Path("output") / sys.argv[1]).read_text())
           assert data["v"] == 1 and 1 <= data["m"] <= 12
+          assert data["total"] and sum(row[2] for row in data["total"]) > 0
           assert len(data["d"]) in (28, 29, 30, 31)
           assert len(data["h"]) == len(data["d"]) * 24
           assert all(len(row) == 5 for group in [data["total"], *data["d"], *data["h"]] for row in group)
