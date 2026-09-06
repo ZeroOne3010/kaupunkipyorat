@@ -1,0 +1,12 @@
+html, body, #map { height: 100%; margin: 0; }
+body { font: 14px/1.4 system-ui, sans-serif; }
+.panel { position: absolute; z-index: 2; top: 12px; left: 12px; width: min(290px, calc(100vw - 48px)); padding: 14px; background: rgba(255,255,255,.94); border-radius: 8px; box-shadow: 0 2px 12px #0004; }
+h1 { font-size: 18px; margin: 0 0 4px; }
+fieldset { border: 0; padding: 10px 0 5px; margin: 0; }
+legend { font-weight: 700; }
+fieldset label { margin-right: 8px; white-space: nowrap; }
+#day-control, #hour-control { display: flex; gap: 8px; align-items: center; margin: 5px 0; }
+#hour { flex: 1; min-width: 80px; }
+button { padding: 6px 10px; }
+.hint { color: #555; margin-bottom: 0; font-size: 12px; }
+@media (max-width: 500px) { .panel { top: 8px; left: 8px; padding: 10px; } }
