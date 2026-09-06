@@ -48,9 +48,22 @@ The compact JSON has a version (`v`), year (`y`), month (`m`), whole-month tuple
 `d[0]` is day 1; `h[0]` is day 1 at 00:00 and `h[24]` is day 2 at 00:00. Empty
 periods remain empty arrays. Rides are aggregated, never included individually.
 
-The demo station metadata is a deliberately small subset transcribed from HSL's
-[city-bike GBFS station information feed](https://digitransit.fi/en/developers/apis/3-routing-api/bicycling/). Trip CSVs are published through
-[HSL's open data resources](https://www.hsl.fi/en/hsl/open-data).
+Station metadata is stored separately in `site/stations.js`. To refresh it, add a
+repository Actions secret named `DIGITRANSIT_SUBSCRIPTION_KEY`, run **Actions →
+Build station metadata → Run workflow**, download the `hsl-city-bike-stations`
+artifact, and replace `site/stations.js` with the downloaded file. The workflow
+queries the [Digitransit vehicle-rental API](https://digitransit.fi/en/developers/apis/1-routing-api/bicycles-scooters-cars/)
+for station IDs, names, latitudes, and longitudes. It keeps Smoove bike stations,
+turning IDs such as `smoove:072` into the integer `72` used by the trip data.
+
+The same file can be built locally with Python and no third-party packages:
+
+```sh
+DIGITRANSIT_SUBSCRIPTION_KEY=... \
+  python preprocess/build-stations.py site/stations.js
+```
+
+Trip CSVs are published through [HSL's open data resources](https://www.hsl.fi/en/hsl/open-data).
 
 ## Deployment
 
@@ -70,6 +83,7 @@ station selection; replace it with a workflow-produced month for real data.
 - advanced statistics
 - automatic ingestion of newly published months
 
-Only the hard-coded stations can be drawn, flows are straight lines, and the UI
-provides basic filtering rather than analysis. Station metadata and map tiles are
-fetched from third parties; the trip aggregates themselves are static.
+Only stations present in the committed station snapshot can be drawn, flows are
+straight lines, and the UI provides basic filtering rather than analysis. Map
+tiles are fetched from a third party; station metadata and trip aggregates are
+static files.

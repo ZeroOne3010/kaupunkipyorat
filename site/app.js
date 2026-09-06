@@ -1,18 +1,4 @@
 const MIN_RIDE_COUNT = 1;
-
-// IDs and positions from HSL's city-bike GBFS station feed (see README).
-const STATIONS = [
-  [1, "Kaivopuisto", 60.155444, 24.950293],
-  [2, "Laivasillankatu", 60.160959, 24.956347],
-  [3, "Kapteeninpuistikko", 60.158189, 24.944927],
-  [4, "Viiskulma", 60.160986, 24.941775],
-  [5, "Sepänkatu", 60.157948, 24.936285],
-  [6, "Hietalahdentori", 60.162225, 24.929709],
-  [7, "Designmuseo", 60.163103, 24.945960],
-  [8, "Vanha kirkkopuisto", 60.164699, 24.939127],
-  [9, "Erottajan aukio", 60.166890, 24.944261],
-  [10, "Kasarmitori", 60.165017, 24.949472]
-];
 const stationById = new Map(STATIONS.map(([id, name, lat, lon]) => [id, {id, name, lat, lon}]));
 let data;
 let selectedId = null;
