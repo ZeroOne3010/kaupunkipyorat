@@ -7,13 +7,13 @@ flows. There is no backend or frontend build step.
 ## Build a month
 
 Run **Actions → Build monthly data → Run workflow**, paste the public URL of an
-HSL monthly `.csv` or `.zip`, and optionally set the JSON filename. When left
-blank, the filename is derived from the URL, so `2025-04.csv` produces
-`2025-04.json`. The job downloads the source, runs `preprocess/build-data.py`,
-validates the result, and creates the `hsl-city-bike-json` artifact. It never
-commits to the repository. The names `months.json` and `sample-month.json` are
-reserved for the generated index and synthetic demo data and cannot be used as
-workflow output filenames.
+HSL `.csv` or a `.zip` containing multiple monthly CSV files. The workflow creates
+one JSON per CSV, named from the month detected in its data (for example,
+`2025-04.json`), and bundles all results in the `hsl-city-bike-json` artifact. An
+optional custom filename can still be used when the source has exactly one CSV.
+The job never commits to the repository. The names `months.json` and
+`sample-month.json` are reserved for the generated index and synthetic demo data
+and cannot be used as workflow output filenames.
 
 Download and unzip that artifact from the workflow run summary, then put the JSON
 in `site/data/` and commit it. During deployment, the Pages workflow discovers all
@@ -25,6 +25,7 @@ For local use:
 
 ```sh
 python preprocess/build-data.py month.zip site/data/sample-month.json
+python preprocess/build-data-batch.py several-months.zip site/data
 python preprocess/build-data-index.py site/data
 python -m http.server --directory site 8000
 ```
