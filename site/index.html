@@ -9,24 +9,55 @@
 </head>
 <body>
   <div id="map" aria-label="Map of Helsinki city-bike trips"></div>
+
+  <aside id="station-summary" class="summary" aria-labelledby="station" hidden>
+    <div class="summary-heading">
+      <div><span class="eyebrow">Station summary</span><h2 id="station">Station</h2></div>
+      <button id="clear" class="icon-button" type="button" aria-label="Close station summary">×</button>
+    </div>
+    <p id="rides">—</p>
+    <div class="summary-columns">
+      <section><h3>Top destinations</h3><ol id="top-outgoing"></ol></section>
+      <section><h3>Top origins</h3><ol id="top-incoming"></ol></section>
+    </div>
+  </aside>
+
   <section class="panel" aria-label="Map controls">
-    <h1>City-bike flows</h1>
-    <label>Month <select id="dataset"><option>Loading data…</option></select></label>
-    <fieldset><legend>Time</legend>
-      <label><input type="radio" name="mode" value="month" checked> Month</label>
-      <label><input type="radio" name="mode" value="day"> Day</label>
-      <label><input type="radio" name="mode" value="hour"> Hour</label>
-    </fieldset>
-    <label id="day-control" hidden>Day <select id="day"></select></label>
-    <label id="hour-control" hidden>Hour <input id="hour" type="range" min="0" value="0"><output id="hour-label"></output></label>
-    <fieldset><legend>Direction</legend>
-      <label><input type="radio" name="direction" value="outgoing"> Outgoing</label>
-      <label><input type="radio" name="direction" value="incoming"> Incoming</label>
-      <label><input type="radio" name="direction" value="both" checked> Both</label>
-    </fieldset>
-    <p><strong id="station">All stations</strong><br><span id="rides">—</span></p>
-    <button id="clear" type="button" hidden>Clear station</button>
-    <p class="hint">Select a station to inspect its trips.</p>
+    <header class="panel-heading">
+      <div><span class="eyebrow">Helsinki</span><h1>City-bike flows</h1></div>
+      <button id="toggle-controls" class="icon-button" type="button" aria-expanded="true" aria-controls="controls-body" aria-label="Collapse map controls">⌄</button>
+    </header>
+    <div id="controls-body">
+      <div class="control-grid">
+        <label class="stacked">Month<select id="dataset"><option>Loading data…</option></select></label>
+        <fieldset><legend>Period</legend>
+          <label><input type="radio" name="mode" value="month" checked> Month</label>
+          <label><input type="radio" name="mode" value="day"> Day</label>
+          <label><input type="radio" name="mode" value="hour"> Hour</label>
+        </fieldset>
+        <div id="day-control" class="step-control" role="group" aria-labelledby="day-control-label" hidden>
+          <span id="day-control-label">Day</span>
+          <button id="previous-day" type="button" aria-label="Previous day">−</button>
+          <select id="day" aria-label="Selected day"></select>
+          <button id="next-day" type="button" aria-label="Next day">+</button>
+        </div>
+        <div id="hour-control" class="step-control" role="group" aria-labelledby="hour-control-label" hidden>
+          <span id="hour-control-label">Hour</span>
+          <button id="previous-hour" type="button" aria-label="Previous hour">−</button>
+          <input id="hour" type="number" min="0" max="23" value="0" inputmode="numeric" aria-label="Selected hour">
+          <button id="next-hour" type="button" aria-label="Next hour">+</button>
+          <output id="hour-label"></output>
+        </div>
+        <label class="stacked threshold">Minimum trips<input id="threshold" type="number" min="1" step="1" value="5" inputmode="numeric"></label>
+        <fieldset><legend>Direction</legend>
+          <label><input type="radio" name="direction" value="outgoing"> Outgoing</label>
+          <label><input type="radio" name="direction" value="incoming"> Incoming</label>
+          <label><input type="radio" name="direction" value="both" checked> Both</label>
+        </fieldset>
+      </div>
+      <p id="all-rides" class="status">—</p>
+      <p class="hint">Select a station for its busiest origins and destinations.</p>
+    </div>
   </section>
   <script src="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.js"></script>
   <script src="stations.js"></script>

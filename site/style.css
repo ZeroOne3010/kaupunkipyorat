@@ -1,13 +1,52 @@
+:root { color-scheme: light; }
+[hidden] { display: none !important; }
 html, body, #map { height: 100%; margin: 0; }
-body { font: 14px/1.4 system-ui, sans-serif; }
-.panel { position: absolute; z-index: 2; top: 12px; left: 12px; width: min(290px, calc(100vw - 48px)); padding: 14px; background: rgba(255,255,255,.94); border-radius: 8px; box-shadow: 0 2px 12px #0004; }
-h1 { font-size: 18px; margin: 0 0 4px; }
-fieldset { border: 0; padding: 10px 0 5px; margin: 0; }
-legend { font-weight: 700; }
+body { font: 14px/1.4 system-ui, sans-serif; color: #17324d; }
+.panel, .summary { position: absolute; z-index: 2; background: rgba(255,255,255,.96); border: 1px solid #d9e1e7; border-radius: 12px; box-shadow: 0 3px 18px #17324d30; }
+.panel { right: 12px; bottom: 12px; left: 12px; padding: 12px 16px; }
+.panel-heading, .summary-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+h1, h2 { margin: 0; line-height: 1.15; }
+h1 { font-size: 18px; }
+h2 { font-size: 17px; }
+.eyebrow { display: block; color: #526a7e; font-size: 10px; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
+.icon-button { width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: #edf3f7; color: #17324d; font-size: 22px; line-height: 1; cursor: pointer; }
+.panel.collapsed { left: auto; min-width: 190px; }
+.panel.collapsed #controls-body { display: none; }
+.panel.collapsed #toggle-controls { transform: rotate(180deg); }
+.control-grid { display: flex; align-items: end; gap: 12px 20px; padding-top: 10px; }
+.stacked { display: grid; gap: 3px; font-weight: 700; }
+select, input[type="number"] { box-sizing: border-box; min-height: 34px; border: 1px solid #aab9c5; border-radius: 6px; background: #fff; color: inherit; padding: 5px 8px; font: inherit; }
+fieldset { border: 0; padding: 0; margin: 0; }
+legend, .step-control > span { display: block; margin-bottom: 3px; font-weight: 700; }
 fieldset label { margin-right: 8px; white-space: nowrap; }
-#day-control, #hour-control { gap: 8px; align-items: center; margin: 5px 0; }
-#day-control:not([hidden]), #hour-control:not([hidden]) { display: flex; }
-#hour { flex: 1; min-width: 80px; }
-button { padding: 6px 10px; }
-.hint { color: #555; margin-bottom: 0; font-size: 12px; }
-@media (max-width: 500px) { .panel { top: 8px; left: 8px; padding: 10px; } }
+.step-control { display: grid; grid-template-columns: auto minmax(92px, auto) auto; align-items: center; gap: 4px; }
+.step-control > span { grid-column: 1 / -1; }
+.step-control button { width: 34px; height: 34px; border: 1px solid #aab9c5; border-radius: 6px; background: #edf3f7; color: inherit; font-size: 19px; cursor: pointer; }
+.step-control button:disabled { cursor: default; opacity: .4; }
+#hour { width: 70px; text-align: center; }
+#hour-label { grid-column: 1 / -1; min-height: 1.2em; color: #526a7e; font-size: 11px; text-align: center; }
+.threshold input { width: 90px; }
+.status { margin: 9px 0 0; font-weight: 700; }
+.hint { color: #526a7e; margin: 1px 0 0; font-size: 12px; }
+.summary { top: 12px; left: 12px; width: min(390px, calc(100vw - 50px)); padding: 14px; }
+.summary > p { margin: 3px 0 12px; color: #526a7e; }
+.summary-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.summary h3 { margin: 0 0 4px; font-size: 12px; }
+.summary ol { margin: 0; padding-left: 22px; }
+.summary li { padding: 2px 0; }
+.summary li span { float: right; margin-left: 8px; font-weight: 750; }
+.summary .empty { color: #6b7e8e; list-style: none; margin-left: -22px; }
+@media (max-width: 850px) {
+  .control-grid { flex-wrap: wrap; }
+}
+@media (max-width: 560px) {
+  .panel { right: 8px; bottom: 8px; left: 8px; max-height: calc(100vh - 32px); overflow: auto; padding: 10px 12px; }
+  .panel.collapsed { left: 8px; min-width: 0; }
+  .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+  .control-grid fieldset { grid-column: 1 / -1; }
+  .step-control { grid-template-columns: 34px minmax(75px, 1fr) 34px; }
+  .threshold input, #dataset { width: 100%; }
+  #hour { width: 100%; }
+  .summary { top: 8px; left: 8px; width: calc(100vw - 44px); max-height: calc(100vh - 190px); overflow: auto; }
+  .summary-columns { gap: 10px; }
+}
