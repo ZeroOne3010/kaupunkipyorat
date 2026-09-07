@@ -1,4 +1,3 @@
-const MIN_RIDE_COUNT = 1;
 const stationById = new Map(STATIONS.map(([id, name, lat, lon]) => [id, {id, name, lat, lon}]));
 let data;
 let selectedId = null;
@@ -8,9 +7,11 @@ const map = new maplibregl.Map({
   container: "map",
   center: [24.944, 60.162],
   zoom: 13.3,
+  attributionControl: false,
   style: "https://tiles.openfreemap.org/styles/bright"
 });
-map.addControl(new maplibregl.NavigationControl(), "bottom-right");
+map.addControl(new maplibregl.NavigationControl(), "top-right");
+map.addControl(new maplibregl.AttributionControl({compact: true}), "top-right");
 
 function stationGeoJSON() {
   return {type: "FeatureCollection", features: STATIONS.map(([id, name, lat, lon]) => ({
@@ -21,8 +22,44 @@ function stationGeoJSON() {
 function currentTuples() {
   const mode = document.querySelector('input[name="mode"]:checked').value;
   if (mode === "day") return data.d[Number(document.querySelector("#day").value)] || [];
-  if (mode === "hour") return data.h[Number(document.querySelector("#hour").value)] || [];
+  if (mode === "hour") {
+    const index = Number(document.querySelector("#day").value) * 24 + Number(document.querySelector("#hour").value);
+    return data.h[index] || [];
+  }
   return data.total;
+}
+
+function minimumRideCount() {
+  return Math.max(1, Number(document.querySelector("#threshold").value) || 1);
+}
+
+function rankedConnections(tuples, outgoing) {
+  const totals = new Map();
+  tuples.forEach(([origin, destination, count]) => {
+    if ((outgoing ? origin : destination) !== selectedId) return;
+    const otherId = outgoing ? destination : origin;
+    if (stationById.has(otherId)) totals.set(otherId, (totals.get(otherId) || 0) + count);
+  });
+  return [...totals].sort((a, b) => b[1] - a[1]).slice(0, 5);
+}
+
+function renderRanking(selector, connections) {
+  const list = document.querySelector(selector);
+  if (!connections.length) {
+    const empty = document.createElement("li");
+    empty.className = "empty";
+    empty.textContent = "No trips";
+    list.replaceChildren(empty);
+    return;
+  }
+  list.replaceChildren(...connections.map(([id, count]) => {
+    const item = document.createElement("li");
+    item.append(document.createTextNode(stationById.get(id).name));
+    const value = document.createElement("span");
+    value.textContent = count.toLocaleString();
+    item.append(value);
+    return item;
+  }));
 }
 
 function update() {
@@ -30,7 +67,7 @@ function update() {
   const direction = document.querySelector('input[name="direction"]:checked').value;
   const tuples = currentTuples();
   let shown = tuples.filter(([origin, destination, count]) => {
-    if (count < MIN_RIDE_COUNT) return false;
+    if (count < minimumRideCount()) return false;
     if (selectedId === null) return true;
     return (direction !== "incoming" && origin === selectedId) || (direction !== "outgoing" && destination === selectedId);
   });
@@ -43,14 +80,21 @@ function update() {
   }))});
   map.getSource("stations").setData(stationGeoJSON());
   const rideCount = shown.reduce((sum, tuple) => sum + tuple[2], 0);
-  document.querySelector("#station").textContent = selectedId === null ? "All stations" : stationById.get(selectedId).name;
-  document.querySelector("#rides").textContent = `${rideCount.toLocaleString()} rides shown`;
-  document.querySelector("#clear").hidden = selectedId === null;
+  document.querySelector("#all-rides").textContent = `${rideCount.toLocaleString()} rides shown`;
+  const summary = document.querySelector("#station-summary");
+  summary.hidden = selectedId === null;
+  if (selectedId !== null) {
+    document.querySelector("#station").textContent = stationById.get(selectedId).name;
+    const stationRideCount = tuples.reduce((sum, [origin, destination, count]) => sum + (origin === selectedId || destination === selectedId ? count : 0), 0);
+    document.querySelector("#rides").textContent = `${stationRideCount.toLocaleString()} trips in selected period`;
+    renderRanking("#top-outgoing", rankedConnections(tuples, true));
+    renderRanking("#top-incoming", rankedConnections(tuples, false));
+  }
 }
 
 function updateTimeControls() {
   const mode = document.querySelector('input[name="mode"]:checked').value;
-  document.querySelector("#day-control").hidden = mode !== "day";
+  document.querySelector("#day-control").hidden = mode === "month";
   document.querySelector("#hour-control").hidden = mode !== "hour";
   updateHourLabel();
   update();
@@ -58,9 +102,34 @@ function updateTimeControls() {
 
 function updateHourLabel() {
   if (!data) return;
-  const index = Number(document.querySelector("#hour").value);
-  const date = new Date(Date.UTC(data.y, data.m - 1, 1, index));
-  document.querySelector("#hour-label").textContent = new Intl.DateTimeFormat(undefined, {day: "numeric", month: "short", hour: "2-digit", timeZone: "UTC"}).format(date);
+  const hour = Number(document.querySelector("#hour").value);
+  document.querySelector("#hour-label").textContent = `${String(hour).padStart(2, "0")}:00–${String((hour + 1) % 24).padStart(2, "0")}:00`;
+  updateStepButtons();
+}
+
+function updateStepButtons() {
+  if (!data) return;
+  const day = Number(document.querySelector("#day").value);
+  document.querySelector("#previous-day").disabled = day <= 0;
+  document.querySelector("#next-day").disabled = day >= data.d.length - 1;
+}
+
+function changeDay(offset) {
+  const day = document.querySelector("#day");
+  day.value = Math.max(0, Math.min(data.d.length - 1, Number(day.value) + offset));
+  updateHourLabel();
+  update();
+}
+
+function changeHour(offset) {
+  const day = document.querySelector("#day");
+  const hour = document.querySelector("#hour");
+  const lastIndex = data.d.length * 24 - 1;
+  const nextIndex = Math.max(0, Math.min(lastIndex, Number(day.value) * 24 + Number(hour.value) + offset));
+  day.value = Math.floor(nextIndex / 24);
+  hour.value = nextIndex % 24;
+  updateHourLabel();
+  update();
 }
 
 async function loadData(dataFile) {
@@ -81,7 +150,6 @@ async function loadData(dataFile) {
   const day = document.querySelector("#day");
   day.replaceChildren(...data.d.map((_, index) => new Option(`${index + 1}.${data.m}.${data.y}`, index)));
   const hour = document.querySelector("#hour");
-  hour.max = data.h.length - 1;
   hour.value = 0;
   updateHourLabel();
   update();
@@ -119,9 +187,27 @@ map.on("load", async () => {
 
 document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener("change", updateTimeControls));
 document.querySelectorAll('input[name="direction"]').forEach(input => input.addEventListener("change", update));
-document.querySelector("#day").addEventListener("change", update);
-document.querySelector("#hour").addEventListener("input", () => { updateHourLabel(); update(); });
+document.querySelector("#day").addEventListener("change", () => { updateHourLabel(); update(); });
+document.querySelector("#hour").addEventListener("change", event => {
+  const currentHour = Number(event.target.value);
+  event.target.value = Number.isFinite(currentHour) ? currentHour : 0;
+  changeHour(0);
+});
+document.querySelector("#previous-day").addEventListener("click", () => changeDay(-1));
+document.querySelector("#next-day").addEventListener("click", () => changeDay(1));
+document.querySelector("#previous-hour").addEventListener("click", () => changeHour(-1));
+document.querySelector("#next-hour").addEventListener("click", () => changeHour(1));
+document.querySelector("#threshold").addEventListener("change", event => {
+  event.target.value = minimumRideCount();
+  update();
+});
 document.querySelector("#clear").addEventListener("click", () => { selectedId = null; update(); });
+document.querySelector("#toggle-controls").addEventListener("click", event => {
+  const panel = event.currentTarget.closest(".panel");
+  const collapsed = panel.classList.toggle("collapsed");
+  event.currentTarget.setAttribute("aria-expanded", String(!collapsed));
+  event.currentTarget.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} map controls`);
+});
 document.querySelector("#dataset").addEventListener("change", async event => {
   try {
     await loadData(event.target.value);
