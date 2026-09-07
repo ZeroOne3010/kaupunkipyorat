@@ -4,7 +4,7 @@ let selectedId = null;
 let selectedDate = null;
 let dataRequestId = 0;
 let availableMonths = new Map();
-const {monthKey, shiftedDate} = TimeNavigation;
+const {availableMonthTarget, monthKey, shiftedDate} = TimeNavigation;
 
 const map = new maplibregl.Map({
   container: "map",
@@ -24,9 +24,9 @@ function stationGeoJSON() {
 
 function currentTuples() {
   const mode = document.querySelector('input[name="mode"]:checked').value;
-  const dayIndex = selectedDate.getDate() - 1;
+  const dayIndex = selectedDate.getUTCDate() - 1;
   if (mode === "day") return data.d[dayIndex] || [];
-  if (mode === "hour") return data.h[dayIndex * 24 + selectedDate.getHours()] || [];
+  if (mode === "hour") return data.h[dayIndex * 24 + selectedDate.getUTCHours()] || [];
   return data.total;
 }
 
@@ -66,13 +66,13 @@ function renderRanking(selector, connections) {
 function periodText(short = false) {
   if (!selectedDate) return "Loading data…";
   const mode = document.querySelector('input[name="mode"]:checked').value;
-  if (mode === "month") return selectedDate.toLocaleDateString(undefined, {month: "long", year: "numeric"});
+  if (mode === "month") return selectedDate.toLocaleDateString(undefined, {month: "long", year: "numeric", timeZone: "UTC"});
   const date = selectedDate.toLocaleDateString(undefined, short
-    ? {day: "numeric", month: "short"}
-    : {day: "numeric", month: "long", year: "numeric"});
+    ? {day: "numeric", month: "short", timeZone: "UTC"}
+    : {day: "numeric", month: "long", year: "numeric", timeZone: "UTC"});
   if (mode === "day") return date;
-  const start = `${String(selectedDate.getHours()).padStart(2, "0")}:00`;
-  const end = `${String((selectedDate.getHours() + 1) % 24).padStart(2, "0")}:00`;
+  const start = `${String(selectedDate.getUTCHours()).padStart(2, "0")}:00`;
+  const end = `${String((selectedDate.getUTCHours() + 1) % 24).padStart(2, "0")}:00`;
   return `${date}${short ? " · " : " · "}${start}${short ? "" : `–${end}`}`;
 }
 
@@ -83,9 +83,16 @@ function updateTimeDisplay() {
 
 function updateNavigationButtons() {
   document.querySelectorAll(".time-navigation button").forEach(button => {
-    const target = selectedDate && shiftedDate(selectedDate, button.dataset.unit, Number(button.dataset.step));
-    button.disabled = !target || !availableMonths.has(monthKey(target));
+    button.disabled = !navigationTarget(button.dataset.unit, Number(button.dataset.step));
   });
+}
+
+function navigationTarget(unit, amount) {
+  if (!selectedDate) return null;
+  const target = shiftedDate(selectedDate, unit, amount);
+  if (availableMonths.has(monthKey(target))) return target;
+  if (unit !== "month") return null;
+  return availableMonthTarget(selectedDate, amount, [...availableMonths.keys()]);
 }
 
 function update() {
@@ -134,7 +141,8 @@ async function loadData(dataFile) {
 
 async function navigateTime(unit, amount) {
   const previousDate = selectedDate;
-  const target = shiftedDate(selectedDate, unit, amount);
+  const target = navigationTarget(unit, amount);
+  if (!target) return;
   const targetFile = availableMonths.get(monthKey(target));
   if (!targetFile) return;
   const notice = document.querySelector("#data-notice");
@@ -175,7 +183,7 @@ map.on("load", async () => {
     ]));
     const latest = months.at(-1);
     await loadData(latest.file);
-    selectedDate = new Date(latest.year, latest.month - 1, 1, 0);
+    selectedDate = new Date(Date.UTC(latest.year, latest.month - 1, 1, 0));
     update();
   } catch (error) {
     document.querySelector("#period-label").textContent = `Could not load data: ${error.message}`;
