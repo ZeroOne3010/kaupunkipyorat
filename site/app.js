@@ -134,12 +134,17 @@ function update() {
   summary.hidden = selectedId === null;
   if (selectedId !== null) {
     document.querySelector("#station").textContent = stationById.get(selectedId).name;
-    const stationRideCount = tuples.reduce((sum, [origin, destination, count]) => sum + (origin === selectedId || destination === selectedId ? count : 0), 0);
-    document.querySelector("#rides").textContent = `${stationRideCount.toLocaleString()} trips in selected period`;
-    const balance = StationBalance.stationBalances([[selectedId]], tuples).get(selectedId);
-    const difference = balance.arrivals - balance.departures;
+    const stationStats = StationSummary.stationSummary(selectedId, tuples);
+    document.querySelector("#rides").textContent = `${stationStats.trips.toLocaleString()} trips in selected period`;
+    const difference = stationStats.arrivals - stationStats.departures;
     const balanceText = difference === 0 ? "Balanced" : `${Math.abs(difference).toLocaleString()} more ${difference > 0 ? "arrivals" : "departures"}`;
-    document.querySelector("#balance-summary").textContent = `${balance.arrivals.toLocaleString()} arrivals · ${balance.departures.toLocaleString()} departures · ${balanceText}`;
+    document.querySelector("#balance-summary").textContent = `${stationStats.arrivals.toLocaleString()} arrivals · ${stationStats.departures.toLocaleString()} departures · ${balanceText}`;
+    document.querySelector("#average-ride").textContent = stationStats.departures
+      ? `${(stationStats.averageDistanceMeters / 1000).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} km · ${StationSummary.formatDuration(stationStats.averageDurationSeconds)}`
+      : "—";
+    document.querySelector("#round-trips").textContent = `${stationStats.roundTrips.toLocaleString()} · ${stationStats.roundTripPercentage.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}%`;
+    document.querySelector("#unique-destinations").textContent = `${stationStats.uniqueDestinations.toLocaleString()} unique`;
+    document.querySelector("#unique-origins").textContent = `${stationStats.uniqueOrigins.toLocaleString()} unique`;
     renderRanking("#top-outgoing", rankedConnections(tuples, true));
     renderRanking("#top-incoming", rankedConnections(tuples, false));
   }
