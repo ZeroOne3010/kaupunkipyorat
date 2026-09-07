@@ -24,43 +24,44 @@
 
   <section class="panel" aria-label="Map controls">
     <header class="panel-heading">
-      <div><span class="eyebrow">Helsinki</span><h1>City-bike flows</h1></div>
+      <div class="panel-title"><span class="eyebrow">Helsinki</span><h1>City-bike flows</h1></div>
+      <p id="collapsed-status" aria-hidden="true">Loading data…</p>
       <button id="toggle-controls" class="icon-button" type="button" aria-expanded="true" aria-controls="controls-body" aria-label="Collapse map controls">⌄</button>
     </header>
     <div id="controls-body">
       <div class="control-grid">
-        <label class="stacked">Month<select id="dataset"><option>Loading data…</option></select></label>
-        <fieldset><legend>Period</legend>
+        <fieldset class="segments mode-control"><legend class="visually-hidden">Period</legend>
           <label><input type="radio" name="mode" value="month" checked> Month</label>
           <label><input type="radio" name="mode" value="day"> Day</label>
           <label><input type="radio" name="mode" value="hour"> Hour</label>
         </fieldset>
-        <div id="day-control" class="step-control" role="group" aria-labelledby="day-control-label" hidden>
-          <span id="day-control-label">Day</span>
-          <button id="previous-day" type="button" aria-label="Previous day">−</button>
-          <select id="day" aria-label="Selected day"></select>
-          <button id="next-day" type="button" aria-label="Next day">+</button>
+        <p id="period-label" class="period-label">Loading data…</p>
+        <div class="time-navigation" role="group" aria-label="Change selected date and time">
+          <button type="button" data-step="-1" data-unit="month" aria-label="Previous available month">−1M</button>
+          <button type="button" data-step="-1" data-unit="day" aria-label="Previous day">−1d</button>
+          <button type="button" data-step="-1" data-unit="hour" aria-label="Previous hour">−1h</button>
+          <span class="navigation-gap" aria-hidden="true"></span>
+          <button type="button" data-step="1" data-unit="hour" aria-label="Next hour">+1h</button>
+          <button type="button" data-step="1" data-unit="day" aria-label="Next day">+1d</button>
+          <button type="button" data-step="1" data-unit="month" aria-label="Next available month">+1M</button>
         </div>
-        <div id="hour-control" class="step-control" role="group" aria-labelledby="hour-control-label" hidden>
-          <span id="hour-control-label">Hour</span>
-          <button id="previous-hour" type="button" aria-label="Previous hour">−</button>
-          <input id="hour" type="number" min="0" max="23" value="0" inputmode="numeric" aria-label="Selected hour">
-          <button id="next-hour" type="button" aria-label="Next hour">+</button>
-          <output id="hour-label"></output>
+        <div class="filter-row">
+          <fieldset class="segments direction-control"><legend class="visually-hidden">Direction</legend>
+            <label><input type="radio" name="direction" value="outgoing"> Outgoing</label>
+            <label><input type="radio" name="direction" value="both" checked> Both</label>
+            <label><input type="radio" name="direction" value="incoming"> Incoming</label>
+          </fieldset>
+          <label class="threshold"><span aria-label="Minimum trips">≥</span><input id="threshold" type="number" min="1" step="1" value="5" inputmode="numeric" aria-label="Minimum trips"></label>
         </div>
-        <label class="stacked threshold">Minimum trips<input id="threshold" type="number" min="1" step="1" value="5" inputmode="numeric"></label>
-        <fieldset><legend>Direction</legend>
-          <label><input type="radio" name="direction" value="outgoing"> Outgoing</label>
-          <label><input type="radio" name="direction" value="incoming"> Incoming</label>
-          <label><input type="radio" name="direction" value="both" checked> Both</label>
-        </fieldset>
       </div>
       <p id="all-rides" class="status">—</p>
+      <p id="data-notice" class="data-notice" role="status" aria-live="polite"></p>
       <p class="hint">Select a station for its busiest origins and destinations.</p>
     </div>
   </section>
   <script src="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.js"></script>
   <script src="stations.js"></script>
+  <script src="time-navigation.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
