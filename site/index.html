@@ -17,9 +17,13 @@
     </div>
     <p id="rides">—</p>
     <p id="balance-summary" class="balance-summary">—</p>
+    <dl class="ride-details">
+      <div><dt>Avg ride</dt><dd id="average-ride">—</dd></div>
+      <div><dt>Round trips</dt><dd id="round-trips">—</dd></div>
+    </dl>
     <div class="summary-columns">
-      <section><h3>Top destinations</h3><ol id="top-outgoing"></ol></section>
-      <section><h3>Top origins</h3><ol id="top-incoming"></ol></section>
+      <section><h3>Top destinations</h3><p id="unique-destinations" class="unique-count">—</p><ol id="top-outgoing"></ol></section>
+      <section><h3>Top origins</h3><p id="unique-origins" class="unique-count">—</p><ol id="top-incoming"></ol></section>
     </div>
   </aside>
 
@@ -76,6 +80,7 @@
   <script src="time-navigation.js"></script>
   <script src="flow-style.js"></script>
   <script src="station-balance.js"></script>
+  <script src="station-summary.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

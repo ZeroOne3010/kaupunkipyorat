@@ -56,8 +56,13 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .summary { top: 12px; left: 12px; width: min(390px, calc(100vw - 50px)); padding: 14px; }
 .summary > p { margin: 3px 0 12px; color: #526a7e; }
 .summary > .balance-summary { margin-top: -9px; font-size: 12px; }
+.ride-details { display: grid; gap: 3px; margin: 0 0 12px; padding: 9px 0; border-block: 1px solid #d9e1e7; }
+.ride-details div { display: grid; grid-template-columns: 82px 1fr; }
+.ride-details dt { color: #526a7e; }
+.ride-details dd { margin: 0; font-weight: 700; }
 .summary-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.summary h3 { margin: 0 0 4px; font-size: 12px; }
+.summary h3 { margin: 0; font-size: 12px; }
+.summary .unique-count { margin: 0 0 4px; color: #526a7e; font-size: 11px; }
 .summary ol { margin: 0; padding-left: 22px; }
 .summary li { padding: 2px 0; }
 .summary li span { float: right; margin-left: 8px; font-weight: 750; }
