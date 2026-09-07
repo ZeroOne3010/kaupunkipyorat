@@ -1,7 +1,10 @@
 const stationById = new Map(STATIONS.map(([id, name, lat, lon]) => [id, {id, name, lat, lon}]));
 let data;
 let selectedId = null;
+let selectedDate = null;
 let dataRequestId = 0;
+let availableMonths = new Map();
+const {monthKey, shiftedDate} = TimeNavigation;
 
 const map = new maplibregl.Map({
   container: "map",
@@ -21,11 +24,9 @@ function stationGeoJSON() {
 
 function currentTuples() {
   const mode = document.querySelector('input[name="mode"]:checked').value;
-  if (mode === "day") return data.d[Number(document.querySelector("#day").value)] || [];
-  if (mode === "hour") {
-    const index = Number(document.querySelector("#day").value) * 24 + Number(document.querySelector("#hour").value);
-    return data.h[index] || [];
-  }
+  const dayIndex = selectedDate.getDate() - 1;
+  if (mode === "day") return data.d[dayIndex] || [];
+  if (mode === "hour") return data.h[dayIndex * 24 + selectedDate.getHours()] || [];
   return data.total;
 }
 
@@ -62,8 +63,34 @@ function renderRanking(selector, connections) {
   }));
 }
 
+function periodText(short = false) {
+  if (!selectedDate) return "Loading data…";
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  if (mode === "month") return selectedDate.toLocaleDateString(undefined, {month: "long", year: "numeric"});
+  const date = selectedDate.toLocaleDateString(undefined, short
+    ? {day: "numeric", month: "short"}
+    : {day: "numeric", month: "long", year: "numeric"});
+  if (mode === "day") return date;
+  const start = `${String(selectedDate.getHours()).padStart(2, "0")}:00`;
+  const end = `${String((selectedDate.getHours() + 1) % 24).padStart(2, "0")}:00`;
+  return `${date}${short ? " · " : " · "}${start}${short ? "" : `–${end}`}`;
+}
+
+function updateTimeDisplay() {
+  document.querySelector("#period-label").textContent = periodText();
+  updateNavigationButtons();
+}
+
+function updateNavigationButtons() {
+  document.querySelectorAll(".time-navigation button").forEach(button => {
+    const target = selectedDate && shiftedDate(selectedDate, button.dataset.unit, Number(button.dataset.step));
+    button.disabled = !target || !availableMonths.has(monthKey(target));
+  });
+}
+
 function update() {
-  if (!data || !map.getSource("flows")) return;
+  if (!data || !selectedDate || !map.getSource("flows")) return;
+  updateTimeDisplay();
   const direction = document.querySelector('input[name="direction"]:checked').value;
   const tuples = currentTuples();
   let shown = tuples.filter(([origin, destination, count]) => {
@@ -80,7 +107,9 @@ function update() {
   }))});
   map.getSource("stations").setData(stationGeoJSON());
   const rideCount = shown.reduce((sum, tuple) => sum + tuple[2], 0);
-  document.querySelector("#all-rides").textContent = `${rideCount.toLocaleString()} rides shown`;
+  const rides = `${rideCount.toLocaleString()} rides`;
+  document.querySelector("#all-rides").textContent = `${rides} shown`;
+  document.querySelector("#collapsed-status").textContent = `${periodText(true)} · ${rides}`;
   const summary = document.querySelector("#station-summary");
   summary.hidden = selectedId === null;
   if (selectedId !== null) {
@@ -92,67 +121,34 @@ function update() {
   }
 }
 
-function updateTimeControls() {
-  const mode = document.querySelector('input[name="mode"]:checked').value;
-  document.querySelector("#day-control").hidden = mode === "month";
-  document.querySelector("#hour-control").hidden = mode !== "hour";
-  updateHourLabel();
-  update();
-}
-
-function updateHourLabel() {
-  if (!data) return;
-  const hour = Number(document.querySelector("#hour").value);
-  document.querySelector("#hour-label").textContent = `${String(hour).padStart(2, "0")}:00–${String((hour + 1) % 24).padStart(2, "0")}:00`;
-  updateStepButtons();
-}
-
-function updateStepButtons() {
-  if (!data) return;
-  const day = Number(document.querySelector("#day").value);
-  document.querySelector("#previous-day").disabled = day <= 0;
-  document.querySelector("#next-day").disabled = day >= data.d.length - 1;
-}
-
-function changeDay(offset) {
-  const day = document.querySelector("#day");
-  day.value = Math.max(0, Math.min(data.d.length - 1, Number(day.value) + offset));
-  updateHourLabel();
-  update();
-}
-
-function changeHour(offset) {
-  const day = document.querySelector("#day");
-  const hour = document.querySelector("#hour");
-  const lastIndex = data.d.length * 24 - 1;
-  const nextIndex = Math.max(0, Math.min(lastIndex, Number(day.value) * 24 + Number(hour.value) + offset));
-  day.value = Math.floor(nextIndex / 24);
-  hour.value = nextIndex % 24;
-  updateHourLabel();
-  update();
-}
-
 async function loadData(dataFile) {
   const requestId = ++dataRequestId;
-  let loadedData;
-  try {
-    const response = await fetch(`data/${dataFile}`);
-    if (requestId !== dataRequestId) return;
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    loadedData = await response.json();
-    if (requestId !== dataRequestId) return;
-  } catch (error) {
-    if (requestId !== dataRequestId) return;
-    throw error;
-  }
+  const response = await fetch(`data/${dataFile}`);
+  if (requestId !== dataRequestId) return false;
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  const loadedData = await response.json();
+  if (requestId !== dataRequestId) return false;
   data = loadedData;
-  selectedId = null;
-  const day = document.querySelector("#day");
-  day.replaceChildren(...data.d.map((_, index) => new Option(`${index + 1}.${data.m}.${data.y}`, index)));
-  const hour = document.querySelector("#hour");
-  hour.value = 0;
-  updateHourLabel();
-  update();
+  return true;
+}
+
+async function navigateTime(unit, amount) {
+  const previousDate = selectedDate;
+  const target = shiftedDate(selectedDate, unit, amount);
+  const targetFile = availableMonths.get(monthKey(target));
+  if (!targetFile) return;
+  const notice = document.querySelector("#data-notice");
+  notice.textContent = "";
+  document.querySelectorAll(".time-navigation button").forEach(button => { button.disabled = true; });
+  try {
+    if (monthKey(target) !== monthKey(previousDate) && !await loadData(targetFile)) return;
+    selectedDate = target;
+    update();
+  } catch (error) {
+    selectedDate = previousDate;
+    notice.textContent = "Data is unavailable for that month.";
+    updateNavigationButtons();
+  }
 }
 
 map.on("load", async () => {
@@ -173,30 +169,25 @@ map.on("load", async () => {
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     const months = await response.json();
     if (!months.length) throw new Error("no monthly data is available");
-    const dataset = document.querySelector("#dataset");
-    dataset.replaceChildren(...months.map(month => new Option(
+    availableMonths = new Map(months.map(month => [
       `${month.year}-${String(month.month).padStart(2, "0")}`,
       month.file
-    )));
-    dataset.value = months.at(-1).file;
-    await loadData(dataset.value);
+    ]));
+    const latest = months.at(-1);
+    await loadData(latest.file);
+    selectedDate = new Date(latest.year, latest.month - 1, 1, 0);
+    update();
   } catch (error) {
-    document.querySelector("#dataset").replaceChildren(new Option(`Could not load data: ${error.message}`));
+    document.querySelector("#period-label").textContent = `Could not load data: ${error.message}`;
+    document.querySelector("#collapsed-status").textContent = "Data unavailable";
   }
 });
 
-document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener("change", updateTimeControls));
+document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="direction"]').forEach(input => input.addEventListener("change", update));
-document.querySelector("#day").addEventListener("change", () => { updateHourLabel(); update(); });
-document.querySelector("#hour").addEventListener("change", event => {
-  const currentHour = Number(event.target.value);
-  event.target.value = Number.isFinite(currentHour) ? currentHour : 0;
-  changeHour(0);
-});
-document.querySelector("#previous-day").addEventListener("click", () => changeDay(-1));
-document.querySelector("#next-day").addEventListener("click", () => changeDay(1));
-document.querySelector("#previous-hour").addEventListener("click", () => changeHour(-1));
-document.querySelector("#next-hour").addEventListener("click", () => changeHour(1));
+document.querySelectorAll(".time-navigation button").forEach(button => button.addEventListener("click", () => {
+  navigateTime(button.dataset.unit, Number(button.dataset.step));
+}));
 document.querySelector("#threshold").addEventListener("change", event => {
   event.target.value = minimumRideCount();
   update();
@@ -207,11 +198,4 @@ document.querySelector("#toggle-controls").addEventListener("click", event => {
   const collapsed = panel.classList.toggle("collapsed");
   event.currentTarget.setAttribute("aria-expanded", String(!collapsed));
   event.currentTarget.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} map controls`);
-});
-document.querySelector("#dataset").addEventListener("change", async event => {
-  try {
-    await loadData(event.target.value);
-  } catch (error) {
-    window.alert(`Could not load data/${event.target.value}: ${error.message}`);
-  }
 });
