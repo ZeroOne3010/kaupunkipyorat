@@ -11,7 +11,8 @@ h2 { font-size: 17px; }
 .eyebrow { display: block; color: #526a7e; font-size: 10px; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
 .icon-button { flex: 0 0 auto; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: #edf3f7; color: #17324d; font-size: 22px; line-height: 1; cursor: pointer; }
 #collapsed-status { display: none; min-width: 0; margin: 0; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.collapsed-navigation { display: none; flex: 0 0 auto; }
+.collapsed-navigation { flex: 0 0 auto; }
+.panel:not(.collapsed) .collapsed-navigation { display: none; }
 .collapsed-navigation button { width: 45px; }
 .panel.collapsed { width: min(380px, calc(100vw - 44px)); padding-block: 8px; }
 .panel.collapsed #controls-body, .panel.collapsed .panel-title { display: none; }
