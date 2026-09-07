@@ -11,9 +11,13 @@ h2 { font-size: 17px; }
 .eyebrow { display: block; color: #526a7e; font-size: 10px; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
 .icon-button { flex: 0 0 auto; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: #edf3f7; color: #17324d; font-size: 22px; line-height: 1; cursor: pointer; }
 #collapsed-status { display: none; min-width: 0; margin: 0; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.collapsed-navigation { flex: 0 0 auto; }
+.panel:not(.collapsed) .collapsed-navigation { display: none; }
+.collapsed-navigation button { width: 45px; }
 .panel.collapsed { width: min(380px, calc(100vw - 44px)); padding-block: 8px; }
 .panel.collapsed #controls-body, .panel.collapsed .panel-title { display: none; }
 .panel.collapsed #collapsed-status { display: block; }
+.panel.collapsed .collapsed-navigation { display: flex; }
 .panel.collapsed #toggle-controls { transform: rotate(180deg); }
 .control-grid { display: grid; gap: 8px; padding-top: 9px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
@@ -61,6 +65,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 @media (max-width: 560px) {
   .panel { right: 8px; bottom: 8px; width: auto; left: 8px; padding: 9px 11px; }
   .panel.collapsed { right: 8px; width: auto; }
+  .panel.collapsed #collapsed-status { font-size: 12px; }
   .segments label { padding-inline: 5px; }
   .time-navigation { gap: 3px; grid-template-columns: repeat(3, minmax(0, 1fr)) 3px repeat(3, minmax(0, 1fr)); }
   .navigation-gap { width: 3px; }

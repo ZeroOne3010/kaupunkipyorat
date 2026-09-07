@@ -27,6 +27,10 @@
     <header class="panel-heading">
       <div class="panel-title"><span class="eyebrow">Helsinki</span><h1>City-bike flows</h1></div>
       <p id="collapsed-status" aria-hidden="true">Loading data…</p>
+      <div id="collapsed-navigation" class="collapsed-navigation time-navigation" role="group" aria-label="Change selected period">
+        <button type="button" data-step="-1" data-unit="month" aria-label="Previous selected period">−1M</button>
+        <button type="button" data-step="1" data-unit="month" aria-label="Next selected period">+1M</button>
+      </div>
       <button id="toggle-controls" class="icon-button" type="button" aria-expanded="true" aria-controls="controls-body" aria-label="Collapse map controls">⌄</button>
     </header>
     <div id="controls-body">
@@ -70,6 +74,7 @@
   <script src="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.js"></script>
   <script src="stations.js"></script>
   <script src="time-navigation.js"></script>
+  <script src="flow-style.js"></script>
   <script src="station-balance.js"></script>
   <script src="app.js"></script>
 </body>

@@ -74,8 +74,8 @@ function periodText(short = false) {
   const mode = document.querySelector('input[name="mode"]:checked').value;
   if (mode === "month") return selectedDate.toLocaleDateString(undefined, {month: "long", year: "numeric", timeZone: "UTC"});
   const date = selectedDate.toLocaleDateString(undefined, short
-    ? {day: "numeric", month: "short", timeZone: "UTC"}
-    : {day: "numeric", month: "long", year: "numeric", timeZone: "UTC"});
+    ? {weekday: "short", day: "numeric", month: "short", timeZone: "UTC"}
+    : {weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC"});
   if (mode === "day") return date;
   const start = `${String(selectedDate.getUTCHours()).padStart(2, "0")}:00`;
   const end = `${String((selectedDate.getUTCHours() + 1) % 24).padStart(2, "0")}:00`;
@@ -84,6 +84,14 @@ function periodText(short = false) {
 
 function updateTimeDisplay() {
   document.querySelector("#period-label").textContent = periodText();
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  const abbreviation = {month: "M", day: "d", hour: "h"}[mode];
+  document.querySelectorAll("#collapsed-navigation button").forEach(button => {
+    const amount = Number(button.dataset.step);
+    button.dataset.unit = mode;
+    button.textContent = `${amount < 0 ? "−" : "+"}1${abbreviation}`;
+    button.setAttribute("aria-label", `${amount < 0 ? "Previous" : "Next"} ${mode}`);
+  });
   updateNavigationButtons();
 }
 
@@ -112,9 +120,8 @@ function update() {
     return (direction !== "incoming" && origin === selectedId) || (direction !== "outgoing" && destination === selectedId);
   });
   shown = shown.filter(([origin, destination]) => stationById.has(origin) && stationById.has(destination));
-  const max = Math.max(1, ...shown.map(tuple => tuple[2]));
   map.getSource("flows").setData({type: "FeatureCollection", features: shown.map(([origin, destination, count]) => ({
-    type: "Feature", properties: {count, scale: count / max}, geometry: {type: "LineString", coordinates: [
+    type: "Feature", properties: {count, scale: FlowStyle.rideCountScale(count)}, geometry: {type: "LineString", coordinates: [
       [stationById.get(origin).lon, stationById.get(origin).lat], [stationById.get(destination).lon, stationById.get(destination).lat]
     ]}
   }))});
