@@ -7,9 +7,11 @@ const map = new maplibregl.Map({
   container: "map",
   center: [24.944, 60.162],
   zoom: 13.3,
+  attributionControl: false,
   style: "https://tiles.openfreemap.org/styles/bright"
 });
-map.addControl(new maplibregl.NavigationControl(), "bottom-right");
+map.addControl(new maplibregl.NavigationControl(), "top-right");
+map.addControl(new maplibregl.AttributionControl({compact: true}), "top-right");
 
 function stationGeoJSON() {
   return {type: "FeatureCollection", features: STATIONS.map(([id, name, lat, lon]) => ({
