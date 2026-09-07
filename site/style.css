@@ -40,9 +40,18 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .status { margin: 1px 0 0; font-weight: 700; }
 .data-notice { min-height: 0; margin: 0; color: #a34400; font-size: 12px; }
 .data-notice:empty { display: none; }
+.balance-legend { display: grid; grid-template-columns: auto 14px auto 14px auto; align-items: center; justify-content: space-between; gap: 4px; color: #526a7e; font-size: 10px; }
+.balance-legend span { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.swatch { display: inline-block; width: 10px; height: 10px; border: 1px solid #17324d; border-radius: 50%; }
+.swatch.negative-strong { background: #c7384f; }
+.swatch.negative { background: #e88e8e; }
+.swatch.neutral { background: #f5f3ed; }
+.swatch.positive { background: #63b58f; }
+.swatch.positive-strong { background: #087f5b; }
 .hint { color: #526a7e; margin: -1px 0 0; font-size: 12px; }
 .summary { top: 12px; left: 12px; width: min(390px, calc(100vw - 50px)); padding: 14px; }
 .summary > p { margin: 3px 0 12px; color: #526a7e; }
+.summary > .balance-summary { margin-top: -9px; font-size: 12px; }
 .summary-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .summary h3 { margin: 0 0 4px; font-size: 12px; }
 .summary ol { margin: 0; padding-left: 22px; }
@@ -57,4 +66,5 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
   .navigation-gap { width: 3px; }
   .summary { top: 8px; left: 8px; width: calc(100vw - 44px); max-height: calc(100vh - 190px); overflow: auto; }
   .summary-columns { gap: 10px; }
+  .balance-legend { font-size: 9px; }
 }
