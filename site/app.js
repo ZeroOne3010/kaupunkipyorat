@@ -16,9 +16,15 @@ const map = new maplibregl.Map({
 map.addControl(new maplibregl.NavigationControl(), "top-right");
 map.addControl(new maplibregl.AttributionControl({compact: true}), "top-right");
 
-function stationGeoJSON() {
+function stationGeoJSON(tuples = []) {
+  const balances = StationBalance.stationBalances(STATIONS, tuples);
   return {type: "FeatureCollection", features: STATIONS.map(([id, name, lat, lon]) => ({
-    type: "Feature", properties: {id, name, selected: id === selectedId}, geometry: {type: "Point", coordinates: [lon, lat]}
+    type: "Feature", properties: {
+      id,
+      name,
+      selected: id === selectedId,
+      balance: StationBalance.balanceCategory(balances.get(id))
+    }, geometry: {type: "Point", coordinates: [lon, lat]}
   }))};
 }
 
@@ -112,7 +118,7 @@ function update() {
       [stationById.get(origin).lon, stationById.get(origin).lat], [stationById.get(destination).lon, stationById.get(destination).lat]
     ]}
   }))});
-  map.getSource("stations").setData(stationGeoJSON());
+  map.getSource("stations").setData(stationGeoJSON(tuples));
   const rideCount = shown.reduce((sum, tuple) => sum + tuple[2], 0);
   const rides = `${rideCount.toLocaleString()} rides`;
   document.querySelector("#all-rides").textContent = `${rides} shown`;
@@ -123,6 +129,10 @@ function update() {
     document.querySelector("#station").textContent = stationById.get(selectedId).name;
     const stationRideCount = tuples.reduce((sum, [origin, destination, count]) => sum + (origin === selectedId || destination === selectedId ? count : 0), 0);
     document.querySelector("#rides").textContent = `${stationRideCount.toLocaleString()} trips in selected period`;
+    const balance = StationBalance.stationBalances([[selectedId]], tuples).get(selectedId);
+    const difference = balance.arrivals - balance.departures;
+    const balanceText = difference === 0 ? "Balanced" : `${Math.abs(difference).toLocaleString()} more ${difference > 0 ? "arrivals" : "departures"}`;
+    document.querySelector("#balance-summary").textContent = `${balance.arrivals.toLocaleString()} arrivals · ${balance.departures.toLocaleString()} departures · ${balanceText}`;
     renderRanking("#top-outgoing", rankedConnections(tuples, true));
     renderRanking("#top-incoming", rankedConnections(tuples, false));
   }
@@ -166,8 +176,12 @@ map.on("load", async () => {
   }});
   map.addSource("stations", {type: "geojson", data: stationGeoJSON()});
   map.addLayer({id: "stations", type: "circle", source: "stations", paint: {
-    "circle-radius": ["case", ["get", "selected"], 9, 6], "circle-color": ["case", ["get", "selected"], "#ed6a00", "#fff"],
-    "circle-stroke-color": "#17324d", "circle-stroke-width": 2
+    "circle-radius": ["case", ["get", "selected"], 9, 6],
+    "circle-color": ["match", ["get", "balance"],
+      "positive-strong", "#087f5b", "positive", "#63b58f", "negative", "#e88e8e", "negative-strong", "#c7384f", "#f5f3ed"
+    ],
+    "circle-stroke-color": ["case", ["get", "selected"], "#ed6a00", "#17324d"],
+    "circle-stroke-width": ["case", ["get", "selected"], 4, 2]
   }});
   map.on("click", "stations", event => { selectedId = Number(event.features[0].properties.id); update(); });
   map.on("mouseenter", "stations", () => { map.getCanvas().style.cursor = "pointer"; });

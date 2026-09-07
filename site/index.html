@@ -16,6 +16,7 @@
       <button id="clear" class="icon-button" type="button" aria-label="Close station summary">×</button>
     </div>
     <p id="rides">—</p>
+    <p id="balance-summary" class="balance-summary">—</p>
     <div class="summary-columns">
       <section><h3>Top destinations</h3><ol id="top-outgoing"></ol></section>
       <section><h3>Top origins</h3><ol id="top-incoming"></ol></section>
@@ -56,12 +57,20 @@
       </div>
       <p id="all-rides" class="status">—</p>
       <p id="data-notice" class="data-notice" role="status" aria-live="polite"></p>
+      <div class="balance-legend" aria-label="Station bike balance legend">
+        <span><i class="swatch negative-strong"></i>More departures</span>
+        <span><i class="swatch negative"></i></span>
+        <span><i class="swatch neutral"></i>Balanced</span>
+        <span><i class="swatch positive"></i></span>
+        <span><i class="swatch positive-strong"></i>More arrivals</span>
+      </div>
       <p class="hint">Select a station for its busiest origins and destinations.</p>
     </div>
   </section>
   <script src="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.js"></script>
   <script src="stations.js"></script>
   <script src="time-navigation.js"></script>
+  <script src="station-balance.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
