@@ -50,7 +50,7 @@ function rankedConnections(tuples, outgoing) {
   return [...totals].sort((a, b) => b[1] - a[1]).slice(0, 5);
 }
 
-function renderRanking(selector, connections) {
+function renderRanking(selector, connections, total) {
   const list = document.querySelector(selector);
   if (!connections.length) {
     const empty = document.createElement("li");
@@ -61,10 +61,16 @@ function renderRanking(selector, connections) {
   }
   list.replaceChildren(...connections.map(([id, count]) => {
     const item = document.createElement("li");
-    item.append(document.createTextNode(stationById.get(id).name));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.stationId = id;
+    button.append(document.createTextNode(stationById.get(id).name));
     const value = document.createElement("span");
-    value.textContent = count.toLocaleString();
-    item.append(value);
+    const share = total ? count / total * 100 : 0;
+    value.textContent = `${count.toLocaleString()}${connections[0][0] === id ? ` · ${share.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}%` : ""}`;
+    button.append(value);
+    button.setAttribute("aria-label", `Select ${stationById.get(id).name}, ${count.toLocaleString()} trips${connections[0][0] === id ? `, ${share.toFixed(1)} percent share` : ""}`);
+    item.append(button);
     return item;
   }));
 }
@@ -137,17 +143,21 @@ function update() {
     document.querySelector("#summary-period").textContent = `Selected period: ${periodText()}`;
     const stationStats = StationSummary.stationSummary(selectedId, tuples);
     document.querySelector("#rides").textContent = `${stationStats.trips.toLocaleString()} trips in selected period`;
+    const busiest = StationSummary.busiestStationRank(selectedId, STATIONS.map(([id]) => id), tuples);
+    document.querySelector("#station-rank").textContent = `#${busiest.rank.toLocaleString()} busiest of ${busiest.total.toLocaleString()} stations`;
     const difference = stationStats.arrivals - stationStats.departures;
     const balanceText = difference === 0 ? "Balanced" : `${Math.abs(difference).toLocaleString()} more ${difference > 0 ? "arrivals" : "departures"}`;
-    document.querySelector("#balance-summary").textContent = `${stationStats.arrivals.toLocaleString()} arrivals · ${stationStats.departures.toLocaleString()} departures · ${balanceText}`;
-    document.querySelector("#average-ride").textContent = stationStats.departures
-      ? `${(stationStats.averageDistanceMeters / 1000).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} km · ${StationSummary.formatDuration(stationStats.averageDurationSeconds)}`
+    const netFlowPercentage = stationStats.arrivals + stationStats.departures ? difference / (stationStats.arrivals + stationStats.departures) * 100 : 0;
+    const netFlowText = `${netFlowPercentage > 0 ? "+" : ""}${netFlowPercentage.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}% net flow`;
+    document.querySelector("#balance-summary").textContent = `${stationStats.arrivals.toLocaleString()} arrivals · ${stationStats.departures.toLocaleString()} departures · ${balanceText} (${netFlowText})`;
+    document.querySelector("#average-ride").textContent = stationStats.trips
+      ? `${(stationStats.averageDistanceMeters / 1000).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} km · ${StationSummary.formatDuration(stationStats.averageDurationSeconds)} · ${stationStats.averageSpeedKmh.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} km/h`
       : "—";
     document.querySelector("#round-trips").textContent = `${stationStats.roundTrips.toLocaleString()} · ${stationStats.roundTripPercentage.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}%`;
     document.querySelector("#unique-destinations").textContent = `${stationStats.uniqueDestinations.toLocaleString()} unique`;
     document.querySelector("#unique-origins").textContent = `${stationStats.uniqueOrigins.toLocaleString()} unique`;
-    renderRanking("#top-outgoing", rankedConnections(tuples, true));
-    renderRanking("#top-incoming", rankedConnections(tuples, false));
+    renderRanking("#top-outgoing", rankedConnections(tuples, true), stationStats.departures);
+    renderRanking("#top-incoming", rankedConnections(tuples, false), stationStats.arrivals);
   }
 }
 
@@ -228,6 +238,12 @@ document.querySelector("#threshold").addEventListener("change", event => {
   update();
 });
 document.querySelector("#clear").addEventListener("click", () => { selectedId = null; update(); });
+document.querySelectorAll("#top-outgoing, #top-incoming").forEach(list => list.addEventListener("click", event => {
+  const button = event.target.closest("button[data-station-id]");
+  if (!button) return;
+  selectedId = Number(button.dataset.stationId);
+  update();
+}));
 document.querySelector("#toggle-summary").addEventListener("click", event => {
   const summary = event.currentTarget.closest(".summary");
   const collapsed = summary.classList.toggle("collapsed");

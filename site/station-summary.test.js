@@ -1,8 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {stationSummary, formatDuration} = require("./station-summary.js");
+const {stationSummary, busiestStationRank, formatDuration} = require("./station-summary.js");
 
-test("stationSummary derives weighted outgoing statistics and connection counts", () => {
+test("stationSummary derives weighted ride statistics and connection counts", () => {
   const summary = stationSummary(1, [
     [1, 2, 2, 1200, 6000],
     [1, 2, 3, 900, 3000],
@@ -17,8 +17,9 @@ test("stationSummary derives weighted outgoing statistics and connection counts"
     departures: 7,
     uniqueDestinations: 2,
     uniqueOrigins: 1,
-    averageDurationSeconds: 428.57142857142856,
-    averageDistanceMeters: 1714.2857142857142,
+    averageDurationSeconds: 418.1818181818182,
+    averageDistanceMeters: 1818.1818181818182,
+    averageSpeedKmh: 15.652173913043478,
     roundTrips: 1,
     roundTripPercentage: 14.285714285714285
   });
@@ -30,6 +31,28 @@ test("stationSummary does not count the selected station as a connection", () =>
   assert.equal(summary.trips, 3);
   assert.equal(summary.uniqueDestinations, 0);
   assert.equal(summary.uniqueOrigins, 0);
+});
+
+test("stationSummary calculates ride averages and speed over incoming and outgoing rides", () => {
+  const summary = stationSummary(1, [
+    [1, 2, 2, 1200, 6000],
+    [3, 1, 1, 1800, 9000]
+  ]);
+
+  assert.equal(summary.averageDurationSeconds, 1000);
+  assert.equal(summary.averageDistanceMeters, 5000);
+  assert.equal(summary.averageSpeedKmh, 18);
+});
+
+test("busiestStationRank ranks activity without counting round trips twice", () => {
+  const ranking = busiestStationRank(1, [1, 2, 3, 4], [
+    [1, 1, 5],
+    [2, 3, 4],
+    [2, 1, 2]
+  ]);
+
+  assert.deepEqual(ranking, {rank: 1, total: 4});
+  assert.deepEqual(busiestStationRank(3, [1, 2, 3, 4], [[1, 2, 4]]), {rank: 3, total: 4});
 });
 
 test("formatDuration produces compact minute and hour labels", () => {

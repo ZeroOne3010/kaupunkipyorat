@@ -60,7 +60,8 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .summary.collapsed #summary-body { display: none; }
 .summary.collapsed #toggle-summary { transform: rotate(180deg); }
 .summary-period { margin: 9px 0 0; color: #526a7e; font-size: 12px; font-weight: 700; }
-#rides { margin: 3px 0 12px; color: #526a7e; }
+.rides-summary { margin: 3px 0 12px; color: #526a7e; }
+.station-rank::before { content: " · "; }
 .summary .balance-summary { margin: -9px 0 12px; color: #526a7e; font-size: 12px; }
 .ride-details { display: grid; gap: 3px; margin: 0 0 12px; padding: 9px 0; border-block: 1px solid #d9e1e7; }
 .ride-details div { display: grid; grid-template-columns: 82px 1fr; }
@@ -70,8 +71,10 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .summary h3 { margin: 0; font-size: 12px; }
 .summary .unique-count { margin: 0 0 4px; color: #526a7e; font-size: 11px; }
 .summary ol { margin: 0; padding-left: 22px; }
-.summary li { padding: 2px 0; }
-.summary li span { float: right; margin-left: 8px; font-weight: 750; }
+.summary li { padding: 0; }
+.summary li button { display: flex; width: 100%; justify-content: space-between; gap: 6px; border: 0; border-radius: 4px; background: transparent; color: inherit; padding: 2px 0; font: inherit; text-align: left; cursor: pointer; }
+.summary li button:hover, .summary li button:focus-visible { color: #006bb6; text-decoration: underline; }
+.summary li span { flex: none; font-weight: 750; }
 .summary .empty { color: #6b7e8e; list-style: none; margin-left: -22px; }
 @media (max-width: 560px) {
   .panel { right: 8px; bottom: 8px; width: auto; left: 8px; padding: 9px 11px; }
