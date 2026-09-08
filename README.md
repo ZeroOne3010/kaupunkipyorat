@@ -1,4 +1,8 @@
-# HSL city-bike flows MVP
+Palvelu Helsingin ja Espoon kaupunkipyörämatkojen visualisointiin. Pohjautuu [HSL:n ja City Bike Finlandin julkaisemaan avoimeen dataan](https://www.hsl.fi/hsl/avoin-data) (CC-BY 4.0). 
+
+---
+
+# Technical details
 
 A dependency-free Python preprocessing step aggregates one monthly HSL city-bike
 trip export, and a static MapLibre site displays the resulting station-to-station
@@ -69,13 +73,10 @@ Trip CSVs are published through [HSL's open data resources](https://www.hsl.fi/e
 ## Deployment
 
 A push to `main` deploys only `site/` with the official GitHub Pages actions.
-Enable **GitHub Actions** as the Pages source in repository settings once. The
-committed sample is synthetic but exercises month, day, hour, direction, and
-station selection; replace it with a workflow-produced month for real data.
+Enable **GitHub Actions** as the Pages source in repository settings once.
 
 ## MVP limitations / future work
 
-- multiple months/years
 - realistic cycling routes
 - route geometry preprocessing
 - animations/particles
@@ -88,3 +89,14 @@ Only stations present in the committed station snapshot can be drawn, flows are
 straight lines, and the UI provides basic filtering rather than analysis. Map
 tiles are fetched from a third party; station metadata and trip aggregates are
 static files.
+
+## Licenses
+
+* Trip data: CC-BY 4.0 City Bike Finland 2016-2026
+* Bike station data: CC-BY 4.0 HSL 2026
+* The code: MIT
+* Map: OpenStreetMap contributors 
+
+---
+
+✨ Made with vibes ✨ 
