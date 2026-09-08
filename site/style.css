@@ -5,9 +5,12 @@ body { font: 14px/1.4 system-ui, sans-serif; color: #17324d; }
 .panel, .summary { position: absolute; z-index: 2; background: rgba(255,255,255,.96); border: 1px solid #d9e1e7; border-radius: 12px; box-shadow: 0 3px 18px #17324d30; }
 .panel { right: 12px; bottom: 12px; width: min(430px, calc(100vw - 58px)); padding: 11px 14px; }
 .panel-heading, .summary-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.summary-heading > div:first-child { min-width: 0; }
+.summary-actions { display: flex; flex: 0 0 auto; gap: 6px; }
 h1, h2 { margin: 0; line-height: 1.15; }
 h1 { font-size: 17px; }
 h2 { font-size: 17px; }
+.summary h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eyebrow { display: block; color: #526a7e; font-size: 10px; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
 .icon-button { flex: 0 0 auto; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: #edf3f7; color: #17324d; font-size: 22px; line-height: 1; cursor: pointer; }
 #collapsed-status { display: none; min-width: 0; margin: 0; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
@@ -54,8 +57,11 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .swatch.positive-strong { background: #087f5b; }
 .hint { color: #526a7e; margin: -1px 0 0; font-size: 12px; }
 .summary { top: 12px; left: 12px; width: min(390px, calc(100vw - 50px)); padding: 14px; }
-.summary > p { margin: 3px 0 12px; color: #526a7e; }
-.summary > .balance-summary { margin-top: -9px; font-size: 12px; }
+.summary.collapsed #summary-body { display: none; }
+.summary.collapsed #toggle-summary { transform: rotate(180deg); }
+.summary-period { margin: 9px 0 0; color: #526a7e; font-size: 12px; font-weight: 700; }
+#rides { margin: 3px 0 12px; color: #526a7e; }
+.summary .balance-summary { margin: -9px 0 12px; color: #526a7e; font-size: 12px; }
 .ride-details { display: grid; gap: 3px; margin: 0 0 12px; padding: 9px 0; border-block: 1px solid #d9e1e7; }
 .ride-details div { display: grid; grid-template-columns: 82px 1fr; }
 .ride-details dt { color: #526a7e; }
