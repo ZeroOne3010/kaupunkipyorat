@@ -134,6 +134,7 @@ function update() {
   summary.hidden = selectedId === null;
   if (selectedId !== null) {
     document.querySelector("#station").textContent = stationById.get(selectedId).name;
+    document.querySelector("#summary-period").textContent = `Selected period: ${periodText()}`;
     const stationStats = StationSummary.stationSummary(selectedId, tuples);
     document.querySelector("#rides").textContent = `${stationStats.trips.toLocaleString()} trips in selected period`;
     const difference = stationStats.arrivals - stationStats.departures;
@@ -227,6 +228,12 @@ document.querySelector("#threshold").addEventListener("change", event => {
   update();
 });
 document.querySelector("#clear").addEventListener("click", () => { selectedId = null; update(); });
+document.querySelector("#toggle-summary").addEventListener("click", event => {
+  const summary = event.currentTarget.closest(".summary");
+  const collapsed = summary.classList.toggle("collapsed");
+  event.currentTarget.setAttribute("aria-expanded", String(!collapsed));
+  event.currentTarget.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} station summary`);
+});
 document.querySelector("#toggle-controls").addEventListener("click", event => {
   const panel = event.currentTarget.closest(".panel");
   const collapsed = panel.classList.toggle("collapsed");

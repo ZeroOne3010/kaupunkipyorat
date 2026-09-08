@@ -13,17 +13,23 @@
   <aside id="station-summary" class="summary" aria-labelledby="station" hidden>
     <div class="summary-heading">
       <div><span class="eyebrow">Station summary</span><h2 id="station">Station</h2></div>
-      <button id="clear" class="icon-button" type="button" aria-label="Close station summary">×</button>
+      <div class="summary-actions">
+        <button id="toggle-summary" class="icon-button" type="button" aria-expanded="true" aria-controls="summary-body" aria-label="Collapse station summary">⌃</button>
+        <button id="clear" class="icon-button" type="button" aria-label="Close station summary">×</button>
+      </div>
     </div>
-    <p id="rides">—</p>
-    <p id="balance-summary" class="balance-summary">—</p>
-    <dl class="ride-details">
-      <div><dt>Avg ride</dt><dd id="average-ride">—</dd></div>
-      <div><dt>Round trips</dt><dd id="round-trips">—</dd></div>
-    </dl>
-    <div class="summary-columns">
-      <section><h3>Top destinations</h3><p id="unique-destinations" class="unique-count">—</p><ol id="top-outgoing"></ol></section>
-      <section><h3>Top origins</h3><p id="unique-origins" class="unique-count">—</p><ol id="top-incoming"></ol></section>
+    <div id="summary-body">
+      <p id="summary-period" class="summary-period">Selected period: —</p>
+      <p id="rides">—</p>
+      <p id="balance-summary" class="balance-summary">—</p>
+      <dl class="ride-details">
+        <div><dt>Avg ride</dt><dd id="average-ride">—</dd></div>
+        <div><dt>Round trips</dt><dd id="round-trips">—</dd></div>
+      </dl>
+      <div class="summary-columns">
+        <section><h3>Top destinations</h3><p id="unique-destinations" class="unique-count">—</p><ol id="top-outgoing"></ol></section>
+        <section><h3>Top origins</h3><p id="unique-origins" class="unique-count">—</p><ol id="top-incoming"></ol></section>
+      </div>
     </div>
   </aside>
 
