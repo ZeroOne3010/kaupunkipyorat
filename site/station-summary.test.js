@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {stationSummary, busiestStationRank, formatDuration} = require("./station-summary.js");
+const {stationSummary, busiestStationRank, formatDuration, formatPeriod, formatNetFlow} = require("./station-summary.js");
 
 test("stationSummary derives weighted ride statistics and connection counts", () => {
   const summary = stationSummary(1, [
@@ -59,4 +59,14 @@ test("formatDuration produces compact minute and hour labels", () => {
   assert.equal(formatDuration(840), "14 min");
   assert.equal(formatDuration(4080), "1 h 08 min");
   assert.equal(formatDuration(7200), "2 h");
+});
+
+test("formatPeriod combines the selected period and trip count", () => {
+  assert.equal(formatPeriod("Wednesday, 1 October 2025 · 00:00–01:00", 3), "Wednesday 1 October 2025, 00:00–01:00 · 3 trips");
+});
+
+test("formatNetFlow shows the signed absolute and percentage balance", () => {
+  assert.equal(formatNetFlow(219, 227), "Net flow -8 (-1.8%)");
+  assert.equal(formatNetFlow(227, 219), "Net flow +8 (+1.8%)");
+  assert.equal(formatNetFlow(0, 0), "Net flow 0 (0.0%)");
 });

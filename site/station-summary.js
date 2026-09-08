@@ -62,7 +62,22 @@
     return `${Math.floor(minutes / 60)} h${remainingMinutes ? ` ${String(remainingMinutes).padStart(2, "0")} min` : ""}`;
   }
 
-  const api = {stationSummary, busiestStationRank, formatDuration};
+  function formatPeriod(period, trips) {
+    const compactPeriod = period
+      .replace(/^([^,]+), /, "$1 ")
+      .replace(" · ", ", ");
+    return `${compactPeriod} · ${trips.toLocaleString()} trips`;
+  }
+
+  function formatNetFlow(arrivals, departures) {
+    const difference = arrivals - departures;
+    const percentage = arrivals + departures ? difference / (arrivals + departures) * 100 : 0;
+    const signedDifference = `${difference > 0 ? "+" : ""}${difference.toLocaleString()}`;
+    const signedPercentage = `${percentage > 0 ? "+" : ""}${percentage.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}%`;
+    return `Net flow ${signedDifference} (${signedPercentage})`;
+  }
+
+  const api = {stationSummary, busiestStationRank, formatDuration, formatPeriod, formatNetFlow};
   root.StationSummary = api;
   if (typeof module !== "undefined") module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -60,8 +60,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .summary.collapsed #summary-body { display: none; }
 .summary.collapsed #toggle-summary { transform: rotate(180deg); }
 .summary-period { margin: 9px 0 0; color: #526a7e; font-size: 12px; font-weight: 700; }
-.rides-summary { margin: 3px 0 12px; color: #526a7e; }
-.station-rank::before { content: " · "; }
+.station-rank { margin: 3px 0 12px; color: #526a7e; }
 .summary .balance-summary { margin: -9px 0 12px; color: #526a7e; font-size: 12px; }
 .ride-details { display: grid; gap: 3px; margin: 0 0 12px; padding: 9px 0; border-block: 1px solid #d9e1e7; }
 .ride-details div { display: grid; grid-template-columns: 82px 1fr; }

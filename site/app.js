@@ -140,16 +140,11 @@ function update() {
   summary.hidden = selectedId === null;
   if (selectedId !== null) {
     document.querySelector("#station").textContent = stationById.get(selectedId).name;
-    document.querySelector("#summary-period").textContent = `Selected period: ${periodText()}`;
     const stationStats = StationSummary.stationSummary(selectedId, tuples);
-    document.querySelector("#rides").textContent = `${stationStats.trips.toLocaleString()} trips in selected period`;
+    document.querySelector("#summary-period").textContent = StationSummary.formatPeriod(periodText(), stationStats.trips);
     const busiest = StationSummary.busiestStationRank(selectedId, STATIONS.map(([id]) => id), tuples);
     document.querySelector("#station-rank").textContent = `#${busiest.rank.toLocaleString()} busiest of ${busiest.total.toLocaleString()} stations`;
-    const difference = stationStats.arrivals - stationStats.departures;
-    const balanceText = difference === 0 ? "Balanced" : `${Math.abs(difference).toLocaleString()} more ${difference > 0 ? "arrivals" : "departures"}`;
-    const netFlowPercentage = stationStats.arrivals + stationStats.departures ? difference / (stationStats.arrivals + stationStats.departures) * 100 : 0;
-    const netFlowText = `${netFlowPercentage > 0 ? "+" : ""}${netFlowPercentage.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}% net flow`;
-    document.querySelector("#balance-summary").textContent = `${stationStats.arrivals.toLocaleString()} arrivals · ${stationStats.departures.toLocaleString()} departures · ${balanceText} (${netFlowText})`;
+    document.querySelector("#balance-summary").textContent = `${stationStats.arrivals.toLocaleString()} arrivals · ${stationStats.departures.toLocaleString()} departures · ${StationSummary.formatNetFlow(stationStats.arrivals, stationStats.departures)}`;
     document.querySelector("#average-ride").textContent = stationStats.trips
       ? `${(stationStats.averageDistanceMeters / 1000).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} km · ${StationSummary.formatDuration(stationStats.averageDurationSeconds)} · ${stationStats.averageSpeedKmh.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} km/h`
       : "—";
