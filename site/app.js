@@ -23,7 +23,7 @@ function stationGeoJSON(tuples = []) {
       id,
       name,
       selected: id === selectedId,
-      balance: StationBalance.balanceCategory(balances.get(id))
+      ...StationStyle.stationProperties(StationStyle.flowBalanceMetric, balances.get(id))
     }, geometry: {type: "Point", coordinates: [lon, lat]}
   }))};
 }
@@ -193,11 +193,29 @@ map.on("load", async () => {
     "line-color": "#006bb6", "line-opacity": ["+", 0.2, ["*", 0.65, ["get", "scale"]]], "line-width": ["+", 1, ["*", 7, ["get", "scale"]]]
   }});
   map.addSource("stations", {type: "geojson", data: stationGeoJSON()});
-  map.addLayer({id: "stations", type: "circle", source: "stations", paint: {
+  const stationCategories = ["neutral", "negative-low", "positive-low", "negative", "positive", "negative-strong", "positive-strong"];
+  stationCategories.forEach(category => map.addLayer({
+    id: `station-heat-${category}`,
+    type: "heatmap",
+    source: "stations",
+    maxzoom: 12,
+    filter: ["==", ["get", "colorCategory"], category],
+    paint: {
+      "heatmap-weight": ["interpolate", ["linear"], ["get", "colorWeight"], 0, 0, 1, 0.15, 500, 1],
+      "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8, 0.7, 12, 1.4],
+      "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 8, 13, 12, 25],
+      "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 10.5, 0.82, 12, 0],
+      "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
+        0, "rgba(255,255,255,0)", 0.3, StationStyle.COLORS[category], 1, StationStyle.COLORS[category]
+      ]
+    }
+  }));
+  map.addLayer({id: "stations", type: "circle", source: "stations", minzoom: 11.5, paint: {
     "circle-radius": ["case", ["get", "selected"], 9, 6],
-    "circle-color": ["match", ["get", "balance"],
-      "positive-strong", "#087f5b", "positive", "#63b58f", "negative", "#e88e8e", "negative-strong", "#c7384f", "#f5f3ed"
-    ],
+    "circle-color": ["match", ["get", "colorCategory"],
+      ...Object.entries(StationStyle.COLORS).flat(), StationStyle.COLORS.neutral],
+    "circle-opacity": ["interpolate", ["linear"], ["zoom"], 11.5, 0, 12, 1],
+    "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 11.5, 0, 12, 1],
     "circle-stroke-color": ["case", ["get", "selected"], "#ed6a00", "#17324d"],
     "circle-stroke-width": ["case", ["get", "selected"], 4, 2]
   }});
