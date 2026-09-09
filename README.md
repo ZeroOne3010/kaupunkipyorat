@@ -11,13 +11,12 @@ flows. There is no backend or frontend build step.
 ## Build a month
 
 Run **Actions → Build monthly data → Run workflow**, paste the public URL of an
-HSL `.csv` or a `.zip` containing multiple monthly CSV files. The workflow creates
-one JSON per CSV, named from the month detected in its data (for example,
-`2025-04.json`), and bundles all results in the `hsl-city-bike-json` artifact. An
-optional custom filename can still be used when the source has exactly one CSV.
-The job never commits to the repository. The names `months.json` and
-`sample-month.json` are reserved for the generated index and synthetic demo data
-and cannot be used as workflow output filenames.
+HSL `.csv` or a `.zip` containing multiple monthly CSV files. Choose aggregate
+files, Monthly Insights record sidecars, or both when starting the workflow. It
+creates one JSON per CSV, named from the month detected in its data (for example,
+`2025-04.json`), and bundles all results in the `hsl-city-bike-json` artifact.
+Names are always derived from the detected month so aggregate files and their
+record sidecars stay aligned. The job never commits to the repository.
 
 Download and unzip that artifact from the workflow run summary, then put the JSON
 in `site/data/` and commit it. During deployment, the Pages workflow discovers all
@@ -30,6 +29,7 @@ For local use:
 ```sh
 python preprocess/build-data.py month.zip site/data/sample-month.json
 python preprocess/build-data-batch.py several-months.zip site/data
+python preprocess/build-data-batch.py several-months.zip site/data/records --kind records
 python preprocess/build-data-index.py site/data
 python -m http.server --directory site 8000
 ```
@@ -52,6 +52,10 @@ The compact JSON has a version (`v`), year (`y`), month (`m`), whole-month tuple
 
 `d[0]` is day 1; `h[0]` is day 1 at 00:00 and `h[24]` is day 2 at 00:00. Empty
 periods remain empty arrays. Rides are aggregated, never included individually.
+
+Monthly Insights sidecars live under `site/data/records/` and contain only five
+selected individual rides. Each ride stores `origin`, `destination`, `durationS`,
+and `distanceM`; display speed is derived in the browser rather than duplicated.
 
 Station metadata is stored separately in `site/stations.js`. To refresh it, add a
 repository Actions secret named `DIGITRANSIT_SUBSCRIPTION_KEY`, run **Actions →

@@ -4,6 +4,9 @@ let selectedId = null;
 let selectedDate = null;
 let dataRequestId = 0;
 let availableMonths = new Map();
+let insightRide = null;
+let insightPreviousView = null;
+const insightCache = new Map();
 const {availableMonthTarget, monthKey, shiftedDate} = TimeNavigation;
 
 const map = new maplibregl.Map({
@@ -23,6 +26,7 @@ function stationGeoJSON(tuples = []) {
       id,
       name,
       selected: id === selectedId,
+      insight: insightRide && (id === insightRide.origin || id === insightRide.destination),
       ...StationStyle.stationProperties(StationStyle.flowBalanceMetric, balances.get(id))
     }, geometry: {type: "Point", coordinates: [lon, lat]}
   }))};
@@ -179,6 +183,8 @@ async function navigateTime(unit, amount) {
   try {
     if (monthKey(target) !== monthKey(previousDate) && !await loadData(targetFile)) return;
     selectedDate = target;
+    closeInsightVisualization();
+    prepareInsights();
     update();
   } catch (error) {
     selectedDate = previousDate;
@@ -191,6 +197,10 @@ map.on("load", async () => {
   map.addSource("flows", {type: "geojson", data: {type: "FeatureCollection", features: []}});
   map.addLayer({id: "flows", type: "line", source: "flows", paint: {
     "line-color": "#006bb6", "line-opacity": ["+", 0.2, ["*", 0.65, ["get", "scale"]]], "line-width": ["+", 1, ["*", 7, ["get", "scale"]]]
+  }});
+  map.addSource("insight-flow", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+  map.addLayer({id: "insight-flow", type: "line", source: "insight-flow", paint: {
+    "line-color": "#ed6a00", "line-width": 5, "line-opacity": .9, "line-dasharray": [1.5, 1]
   }});
   map.addSource("stations", {type: "geojson", data: stationGeoJSON()});
   const stationCategories = ["neutral", "negative-low", "positive-low", "negative", "positive", "negative-strong", "positive-strong"];
@@ -219,7 +229,10 @@ map.on("load", async () => {
     "circle-stroke-color": ["case", ["get", "selected"], "#ed6a00", "#17324d"],
     "circle-stroke-width": ["case", ["get", "selected"], 4, 2]
   }});
-  map.on("click", "stations", event => { selectedId = Number(event.features[0].properties.id); update(); });
+  map.addLayer({id: "insight-stations", type: "circle", source: "stations", minzoom: 0, filter: ["==", ["get", "insight"], true], paint: {
+    "circle-radius": 10, "circle-color": "#fff", "circle-stroke-color": "#ed6a00", "circle-stroke-width": 5
+  }});
+  map.on("click", "stations", event => { closeInsightVisualization(); selectedId = Number(event.features[0].properties.id); update(); });
   map.on("mouseenter", "stations", () => { map.getCanvas().style.cursor = "pointer"; });
   map.on("mouseleave", "stations", () => { map.getCanvas().style.cursor = ""; });
   try {
@@ -235,6 +248,7 @@ map.on("load", async () => {
     await loadData(latest.file);
     selectedDate = new Date(Date.UTC(latest.year, latest.month - 1, 1, 0));
     update();
+    prepareInsights();
   } catch (error) {
     document.querySelector("#period-label").textContent = `Could not load data: ${error.message}`;
     document.querySelector("#collapsed-status").textContent = "Data unavailable";
@@ -268,4 +282,103 @@ document.querySelector("#toggle-controls").addEventListener("click", event => {
   const collapsed = panel.classList.toggle("collapsed");
   event.currentTarget.setAttribute("aria-expanded", String(!collapsed));
   event.currentTarget.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} map controls`);
+});
+
+function recordsUrl() {
+  return `data/records/${monthKey(selectedDate)}.json`;
+}
+
+async function prepareInsights() {
+  if (!selectedDate) return;
+  const key = monthKey(selectedDate);
+  const button = document.querySelector("#open-insights");
+  button.disabled = true;
+  if (!insightCache.has(key)) {
+    try {
+      const response = await fetch(recordsUrl());
+      insightCache.set(key, response.ok ? await response.json() : null);
+    } catch (_) {
+      insightCache.set(key, null);
+    }
+  }
+  if (selectedDate && monthKey(selectedDate) === key) {
+    button.disabled = false;
+    button.title = insightCache.get(key) ? "View monthly ride records" : "Insights unavailable for this month";
+  }
+}
+
+function showInsights() {
+  if (insightRide) {
+    closeInsightVisualization();
+    return;
+  }
+  const result = insightCache.get(monthKey(selectedDate));
+  const rides = MonthlyInsights.records(result);
+  const list = document.querySelector("#insights-list");
+  list.replaceChildren(...rides.map(ride => {
+    const origin = stationById.get(Number(ride.origin));
+    const destination = stationById.get(Number(ride.destination));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "insight-row";
+    button.disabled = !origin || !destination;
+    button.dataset.insightKey = ride.key;
+    const label = document.createElement("span"); label.className = "insight-label"; label.textContent = ride.label;
+    const route = document.createElement("span"); route.className = "insight-route"; route.textContent = `${origin?.name || ride.origin} → ${destination?.name || ride.destination}`;
+    const details = document.createElement("span"); details.className = "insight-details"; details.textContent = MonthlyInsights.details(ride.key, ride);
+    button.append(label, route, details);
+    return button;
+  }));
+  document.querySelector("#insights-month").textContent = `${selectedDate.toLocaleDateString(undefined, {month: "long", year: "numeric", timeZone: "UTC"})} — Monthly insights`;
+  document.querySelector("#insights-unavailable").hidden = rides.length > 0;
+  document.querySelector("#insights-panel").hidden = false;
+  document.querySelector("#insights-backdrop").hidden = false;
+  document.querySelector("#close-insights").focus();
+}
+
+function hideInsights() {
+  document.querySelector("#insights-panel").hidden = true;
+  document.querySelector("#insights-backdrop").hidden = true;
+}
+
+function visualizeInsight(ride) {
+  const origin = stationById.get(Number(ride.origin));
+  const destination = stationById.get(Number(ride.destination));
+  if (!origin || !destination) return;
+  insightPreviousView = {center: map.getCenter(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch()};
+  insightRide = {...ride, origin: origin.id, destination: destination.id};
+  const coordinates = [[origin.lon, origin.lat], [destination.lon, destination.lat]];
+  map.getSource("insight-flow").setData({type: "FeatureCollection", features: origin.id === destination.id ? [] : [{type: "Feature", properties: {}, geometry: {type: "LineString", coordinates}}]});
+  map.getSource("stations").setData(stationGeoJSON(currentTuples()));
+  if (origin.id === destination.id) map.jumpTo({center: coordinates[0], zoom: Math.max(map.getZoom(), 14)});
+  else map.fitBounds(coordinates, {padding: 70, maxZoom: 14, duration: 0});
+  hideInsights();
+  const opener = document.querySelector("#open-insights");
+  opener.innerHTML = '<span aria-hidden="true">×</span> Insight';
+  opener.setAttribute("aria-label", "Close insight visualization and restore map");
+}
+
+function closeInsightVisualization() {
+  if (!insightRide) return;
+  insightRide = null;
+  map.getSource("insight-flow")?.setData({type: "FeatureCollection", features: []});
+  if (data) map.getSource("stations")?.setData(stationGeoJSON(currentTuples()));
+  if (insightPreviousView) map.jumpTo(insightPreviousView);
+  insightPreviousView = null;
+  const opener = document.querySelector("#open-insights");
+  opener.innerHTML = '<span aria-hidden="true">✦</span> Insights';
+  opener.setAttribute("aria-label", "Open monthly insights");
+}
+
+document.querySelector("#open-insights").addEventListener("click", showInsights);
+document.querySelector("#close-insights").addEventListener("click", hideInsights);
+document.querySelector("#insights-backdrop").addEventListener("click", hideInsights);
+document.querySelector("#insights-list").addEventListener("click", event => {
+  const button = event.target.closest("[data-insight-key]");
+  if (!button) return;
+  const ride = MonthlyInsights.records(insightCache.get(monthKey(selectedDate))).find(item => item.key === button.dataset.insightKey);
+  if (ride) visualizeInsight(ride);
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !document.querySelector("#insights-panel").hidden) hideInsights();
 });
