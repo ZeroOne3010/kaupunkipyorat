@@ -14,6 +14,10 @@ SCRIPT = Path(__file__).with_name("build-data.py")
 SPEC = importlib.util.spec_from_file_location("build_data", SCRIPT)
 build_data = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(build_data)
+RECORDS_SCRIPT = Path(__file__).with_name("build-records.py")
+RECORDS_SPEC = importlib.util.spec_from_file_location("build_records", RECORDS_SCRIPT)
+build_records = importlib.util.module_from_spec(RECORDS_SPEC)
+RECORDS_SPEC.loader.exec_module(build_records)
 
 
 def csv_sources(source, temporary_directory):
@@ -41,13 +45,16 @@ def csv_sources(source, temporary_directory):
     return extracted
 
 
-def build_all(source, output_directory, output_filename=None):
+def build_all(source, output_directory, output_filename=None, kind="aggregate"):
     output_directory.mkdir(parents=True, exist_ok=True)
     built = []
     months = set()
     with tempfile.TemporaryDirectory() as directory:
         for csv_source in csv_sources(source, Path(directory)):
-            result, stats = build_data.build(csv_source)
+            if kind == "records":
+                result, stats = build_records.build(csv_source), None
+            else:
+                result, stats = build_data.build(csv_source)
             month = (result["y"], result["m"])
             if month in months:
                 raise ValueError(f"more than one CSV contains month {month[0]:04d}-{month[1]:02d}")
@@ -64,8 +71,8 @@ def build_all(source, output_directory, output_filename=None):
         destination.write_text(json.dumps(result, separators=(",", ":")) + "\n", encoding="utf-8")
         outputs.append(destination)
         print(
-            f"Built {destination}: {stats[1]} valid rides, {stats[2]} skipped rows, "
-            f"{stats[3]} OD pairs"
+            f"Built {destination}" + (f": {stats[1]} valid rides, {stats[2]} skipped rows, "
+            f"{stats[3]} OD pairs" if stats else "")
         )
     return outputs
 
@@ -75,9 +82,10 @@ def main():
     parser.add_argument("input", type=Path, help="a .csv or .zip containing monthly CSV files")
     parser.add_argument("output_directory", type=Path, help="directory for monthly JSON files")
     parser.add_argument("--output-filename", help="custom .json name (only valid for one CSV)")
+    parser.add_argument("--kind", choices=("aggregate", "records"), default="aggregate")
     args = parser.parse_args()
     try:
-        build_all(args.input, args.output_directory, args.output_filename)
+        build_all(args.input, args.output_directory, args.output_filename, args.kind)
     except (OSError, ValueError, build_data.csv.Error, zipfile.BadZipFile) as error:
         parser.exit(1, f"error: {error}\n")
 

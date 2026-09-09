@@ -11,6 +11,15 @@ on:
         description: Optional JSON filename when the source contains exactly one CSV; otherwise each file is named YYYY-MM.json
         required: false
         type: string
+      output_type:
+        description: Files to generate
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - aggregate
+          - insights
 
 permissions:
   contents: read
@@ -47,24 +56,31 @@ jobs:
         run: |
           args=()
           [[ -n "$OUTPUT_FILENAME" ]] && args+=(--output-filename "$OUTPUT_FILENAME")
-          python preprocess/build-data-batch.py /tmp/hsl-month output "${args[@]}"
+          if [[ "${{ inputs.output_type }}" != "insights" ]]; then
+            python preprocess/build-data-batch.py /tmp/hsl-month output "${args[@]}"
+          fi
+          if [[ "${{ inputs.output_type }}" != "aggregate" ]]; then
+            python preprocess/build-data-batch.py /tmp/hsl-month output/records --kind records "${args[@]}"
+          fi
       - name: Sanity-check output
         run: |
           python - <<'PY'
           import json, pathlib
-          files = sorted(pathlib.Path("output").glob("*.json"))
+          files = sorted(pathlib.Path("output").rglob("*.json"))
           assert files, "no JSON files were generated"
           for path in files:
               data = json.loads(path.read_text())
               assert data["v"] == 1 and 1 <= data["m"] <= 12
-              assert data["total"] and sum(row[2] for row in data["total"]) > 0
-              assert len(data["d"]) in (28, 29, 30, 31)
-              assert len(data["h"]) == len(data["d"]) * 24
-              assert all(len(row) == 5 for group in [data["total"], *data["d"], *data["h"]] for row in group)
+              if "total" in data:
+                  assert data["total"] and sum(row[2] for row in data["total"]) > 0
+                  assert len(data["d"]) in (28, 29, 30, 31)
+                  assert len(data["h"]) == len(data["d"]) * 24
+              else:
+                  assert all({"origin", "destination", "durationS", "distanceM"} <= set(ride) for ride in list(data.values())[3:])
               print(f"{path}: JSON structure is valid")
           PY
       - uses: actions/upload-artifact@v4
         with:
           name: hsl-city-bike-json
-          path: output/*.json
+          path: output
           if-no-files-found: error

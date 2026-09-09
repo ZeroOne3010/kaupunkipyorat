@@ -35,7 +35,7 @@
 
   <section class="panel" aria-label="Map controls">
     <header class="panel-heading">
-      <div class="panel-title"><span class="eyebrow">Helsinki</span><h1>City-bike flows</h1></div>
+      <div class="panel-title"><span class="eyebrow">Helsinki</span><div class="title-row"><h1>City-bike flows</h1><button id="open-insights" class="insights-button" type="button" aria-haspopup="dialog" disabled><span aria-hidden="true">✦</span> Insights</button></div></div>
       <p id="collapsed-status" aria-hidden="true">Loading data…</p>
       <div id="collapsed-navigation" class="collapsed-navigation time-navigation" role="group" aria-label="Change selected period">
         <button type="button" data-step="-1" data-unit="month" aria-label="Previous selected period">−1M</button>
@@ -83,6 +83,16 @@
       <p class="hint">Select a station for its busiest origins and destinations.</p>
     </div>
   </section>
+
+  <div id="insights-backdrop" class="insights-backdrop" hidden></div>
+  <section id="insights-panel" class="insights-panel" role="dialog" aria-modal="true" aria-labelledby="insights-title" hidden>
+    <header class="insights-heading">
+      <div><span id="insights-month" class="eyebrow">Monthly insights</span><h2 id="insights-title">Monthly Insights</h2></div>
+      <button id="close-insights" class="icon-button" type="button" aria-label="Close monthly insights">×</button>
+    </header>
+    <div id="insights-list" class="insights-list"></div>
+    <p id="insights-unavailable" class="insights-unavailable" hidden>Insights unavailable for this month.</p>
+  </section>
   <script src="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.js"></script>
   <script src="stations.js"></script>
   <script src="time-navigation.js"></script>
@@ -90,6 +100,7 @@
   <script src="station-style.js"></script>
   <script src="station-balance.js"></script>
   <script src="station-summary.js"></script>
+  <script src="monthly-insights.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
