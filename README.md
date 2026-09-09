@@ -14,11 +14,9 @@ Run **Actions → Build monthly data → Run workflow**, paste the public URL of
 HSL `.csv` or a `.zip` containing multiple monthly CSV files. Choose aggregate
 files, Monthly Insights record sidecars, or both when starting the workflow. It
 creates one JSON per CSV, named from the month detected in its data (for example,
-`2025-04.json`), and bundles all results in the `hsl-city-bike-json` artifact. An
-optional custom filename can still be used when the source has exactly one CSV.
-The job never commits to the repository. The names `months.json` and
-`sample-month.json` are reserved for the generated index and synthetic demo data
-and cannot be used as workflow output filenames.
+`2025-04.json`), and bundles all results in the `hsl-city-bike-json` artifact.
+Names are always derived from the detected month so aggregate files and their
+record sidecars stay aligned. The job never commits to the repository.
 
 Download and unzip that artifact from the workflow run summary, then put the JSON
 in `site/data/` and commit it. During deployment, the Pages workflow discovers all

@@ -29,17 +29,17 @@ def build(source):
         for row in reader:
             try:
                 departure = build_data.parse_time(row[columns["departure"]])
-                current_month = (departure.year, departure.month)
-                if month is None:
-                    month = current_month
-                elif current_month != month:
-                    continue
                 ride = {
                     "origin": build_data.integer(row[columns["origin"]], "origin station ID"),
                     "destination": build_data.integer(row[columns["destination"]], "destination station ID"),
                     "durationS": build_data.integer(row[columns["duration"]], "duration"),
                     "distanceM": build_data.integer(row[columns["distance"]], "distance"),
                 }
+                current_month = (departure.year, departure.month)
+                if month is None:
+                    month = current_month
+                elif current_month != month:
+                    continue
                 # Ignore zero/tiny administrative trips. A 40 km/h ceiling excludes
                 # common dock/data errors while retaining unusually quick bike rides.
                 meaningful = ride["distanceM"] >= 500 and ride["durationS"] >= 60

@@ -45,7 +45,7 @@ def csv_sources(source, temporary_directory):
     return extracted
 
 
-def build_all(source, output_directory, output_filename=None, kind="aggregate"):
+def build_all(source, output_directory, kind="aggregate"):
     output_directory.mkdir(parents=True, exist_ok=True)
     built = []
     months = set()
@@ -61,12 +61,9 @@ def build_all(source, output_directory, output_filename=None, kind="aggregate"):
             months.add(month)
             built.append((result, stats))
 
-    if output_filename and len(built) != 1:
-        raise ValueError("a custom output filename can only be used when the source contains one CSV")
-
     outputs = []
     for result, stats in sorted(built, key=lambda item: (item[0]["y"], item[0]["m"])):
-        filename = output_filename or f"{result['y']:04d}-{result['m']:02d}.json"
+        filename = f"{result['y']:04d}-{result['m']:02d}.json"
         destination = output_directory / filename
         destination.write_text(json.dumps(result, separators=(",", ":")) + "\n", encoding="utf-8")
         outputs.append(destination)
@@ -81,11 +78,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="a .csv or .zip containing monthly CSV files")
     parser.add_argument("output_directory", type=Path, help="directory for monthly JSON files")
-    parser.add_argument("--output-filename", help="custom .json name (only valid for one CSV)")
     parser.add_argument("--kind", choices=("aggregate", "records"), default="aggregate")
     args = parser.parse_args()
     try:
-        build_all(args.input, args.output_directory, args.output_filename, args.kind)
+        build_all(args.input, args.output_directory, args.kind)
     except (OSError, ValueError, build_data.csv.Error, zipfile.BadZipFile) as error:
         parser.exit(1, f"error: {error}\n")
 
