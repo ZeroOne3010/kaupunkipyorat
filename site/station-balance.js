@@ -1,4 +1,6 @@
 (function (root) {
+  const StationStyle = root.StationStyle || (typeof require !== "undefined" ? require("./station-style.js") : null);
+
   function stationBalances(stations, tuples) {
     const balances = new Map(stations.map(([id]) => [id, {arrivals: 0, departures: 0}]));
 
@@ -12,14 +14,8 @@
 
   function balanceCategory({arrivals, departures}) {
     const activity = arrivals + departures;
-    if (!activity) return "neutral";
-
-    const relativeDifference = (arrivals - departures) / activity;
-    if (Math.abs(relativeDifference) <= 0.1) return "neutral";
-    if (relativeDifference > 0.3) return "positive-strong";
-    if (relativeDifference > 0) return "positive";
-    if (relativeDifference < -0.3) return "negative-strong";
-    return "negative";
+    const relativeDifference = activity ? (arrivals - departures) / activity : 0;
+    return StationStyle.divergingCategory(relativeDifference);
   }
 
   const api = {stationBalances, balanceCategory};
