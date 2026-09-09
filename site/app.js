@@ -198,15 +198,15 @@ map.on("load", async () => {
     id: `station-heat-${category}`,
     type: "heatmap",
     source: "stations",
-    maxzoom: 12,
+    maxzoom: 12.5,
     filter: ["==", ["get", "colorCategory"], category],
     paint: {
-      "heatmap-weight": ["interpolate", ["linear"], ["get", "colorWeight"], 0, 0, 1, 0.15, 500, 1],
-      "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8, 0.7, 12, 1.4],
-      "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 8, 13, 12, 25],
-      "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 10.5, 0.82, 12, 0],
+      "heatmap-weight": ["interpolate", ["linear"], ["get", "colorWeight"], 0, 0, 1, 0.3, 500, 1],
+      "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 10, 1.5, 12, 2.4],
+      "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 8, 18, 10, 28, 12, 40],
+      "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 11.5, 0.9, 12.5, 0],
       "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
-        0, "rgba(255,255,255,0)", 0.3, StationStyle.COLORS[category], 1, StationStyle.COLORS[category]
+        0, "rgba(255,255,255,0)", 0.08, StationStyle.COLORS[category], 1, StationStyle.COLORS[category]
       ]
     }
   }));
