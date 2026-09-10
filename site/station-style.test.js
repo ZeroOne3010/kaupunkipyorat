@@ -20,13 +20,13 @@ test("stationProperties delegates styling to the selected metric", () => {
   });
 });
 
-test("heatmapColor keeps category layers vivid across the density ramp", () => {
+test("heatmapColor increases visibility without making overlapping layers opaque", () => {
   assert.deepEqual(heatmapColor("positive-strong"), [
     "interpolate", ["linear"], ["heatmap-density"],
     0, "rgba(8,127,91,0)",
-    0.08, "rgba(8,127,91,0.14)",
-    0.25, "rgba(8,127,91,0.35)",
-    0.5, "rgba(8,127,91,0.62)",
-    1, "rgba(8,127,91,0.9)"
+    0.08, "rgba(8,127,91,0.1)",
+    0.25, "rgba(8,127,91,0.26)",
+    0.5, "rgba(8,127,91,0.44)",
+    1, "rgba(8,127,91,0.68)"
   ]);
 });
