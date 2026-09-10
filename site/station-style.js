@@ -39,12 +39,15 @@
 
   function heatmapColor(category) {
     const color = COLORS[category];
+    // Keep the upper ramp translucent because each category is rendered as a
+    // separate layer. A high alpha here lets the last overlapping layer hide
+    // the categories below it; lift the sparse and mid-density stops instead.
     return ["interpolate", ["linear"], ["heatmap-density"],
       0, colorWithOpacity(color, 0),
-      0.08, colorWithOpacity(color, 0.05),
-      0.25, colorWithOpacity(color, 0.18),
-      0.5, colorWithOpacity(color, 0.38),
-      1, colorWithOpacity(color, 0.65)
+      0.08, colorWithOpacity(color, 0.1),
+      0.25, colorWithOpacity(color, 0.26),
+      0.5, colorWithOpacity(color, 0.44),
+      1, colorWithOpacity(color, 0.68)
     ];
   }
 
