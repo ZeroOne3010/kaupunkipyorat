@@ -41,10 +41,10 @@
     const color = COLORS[category];
     return ["interpolate", ["linear"], ["heatmap-density"],
       0, colorWithOpacity(color, 0),
-      0.08, colorWithOpacity(color, 0.05),
-      0.25, colorWithOpacity(color, 0.18),
-      0.5, colorWithOpacity(color, 0.38),
-      1, colorWithOpacity(color, 0.65)
+      0.08, colorWithOpacity(color, 0.14),
+      0.25, colorWithOpacity(color, 0.35),
+      0.5, colorWithOpacity(color, 0.62),
+      1, colorWithOpacity(color, 0.9)
     ];
   }
 
