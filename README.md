@@ -53,9 +53,12 @@ The compact JSON has a version (`v`), year (`y`), month (`m`), whole-month tuple
 `d[0]` is day 1; `h[0]` is day 1 at 00:00 and `h[24]` is day 2 at 00:00. Empty
 periods remain empty arrays. Rides are aggregated, never included individually.
 
-Monthly Insights sidecars live under `site/data/records/` and contain only five
-selected individual rides. Each ride stores `origin`, `destination`, `durationS`,
-and `distanceM`; display speed is derived in the browser rather than duplicated.
+Monthly Insights sidecars live under `site/data/records/` and contain up to five
+ranked rides for each record. Rides longer than 24 hours are excluded from every
+record, and round trips are excluded from the quickest-ride ranking. Each ride
+stores `origin`, `destination`, `durationS`, and `distanceM`; display speed is
+derived in the browser rather than duplicated. The records build logs the count
+and percentage of rides excluded by the 24-hour limit.
 
 Station metadata is stored separately in `site/stations.js`. To refresh it, add a
 repository Actions secret named `DIGITRANSIT_SUBSCRIPTION_KEY`, run **Actions →

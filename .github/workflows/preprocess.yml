@@ -48,13 +48,13 @@ jobs:
           assert files, "no JSON files were generated"
           for path in files:
               data = json.loads(path.read_text())
-              assert data["v"] == 1 and 1 <= data["m"] <= 12
+              assert data["v"] in (1, 2) and 1 <= data["m"] <= 12
               if "total" in data:
                   assert data["total"] and sum(row[2] for row in data["total"]) > 0
                   assert len(data["d"]) in (28, 29, 30, 31)
                   assert len(data["h"]) == len(data["d"]) * 24
               else:
-                  assert all({"origin", "destination", "durationS", "distanceM"} <= set(ride) for ride in list(data.values())[3:])
+                  assert all({"origin", "destination", "durationS", "distanceM"} <= set(ride) for rides in list(data.values())[3:] for ride in (rides if isinstance(rides, list) else [rides]))
               print(f"{path}: JSON structure is valid")
           PY
       - uses: actions/upload-artifact@v4
