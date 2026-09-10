@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {divergingCategory, flowBalanceMetric, stationProperties} = require("./station-style.js");
+const {divergingCategory, flowBalanceMetric, stationProperties, heatmapColor} = require("./station-style.js");
 
 test("divergingCategory supports configurable, symmetric bands", () => {
   assert.equal(divergingCategory(0.1, [0.1, 0.2, 0.4]), "neutral");
@@ -18,4 +18,15 @@ test("stationProperties delegates styling to the selected metric", () => {
     colorCategory: "custom",
     colorWeight: 7
   });
+});
+
+test("heatmapColor keeps category layers translucent across the density ramp", () => {
+  assert.deepEqual(heatmapColor("positive-strong"), [
+    "interpolate", ["linear"], ["heatmap-density"],
+    0, "rgba(8,127,91,0)",
+    0.08, "rgba(8,127,91,0.05)",
+    0.25, "rgba(8,127,91,0.18)",
+    0.5, "rgba(8,127,91,0.38)",
+    1, "rgba(8,127,91,0.65)"
+  ]);
 });

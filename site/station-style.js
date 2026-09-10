@@ -32,7 +32,23 @@
     return metric.properties(datum);
   }
 
-  const api = {COLORS, divergingCategory, flowBalanceMetric, stationProperties};
+  function colorWithOpacity(color, opacity) {
+    const channels = color.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16));
+    return `rgba(${channels.join(",")},${opacity})`;
+  }
+
+  function heatmapColor(category) {
+    const color = COLORS[category];
+    return ["interpolate", ["linear"], ["heatmap-density"],
+      0, colorWithOpacity(color, 0),
+      0.08, colorWithOpacity(color, 0.05),
+      0.25, colorWithOpacity(color, 0.18),
+      0.5, colorWithOpacity(color, 0.38),
+      1, colorWithOpacity(color, 0.65)
+    ];
+  }
+
+  const api = {COLORS, divergingCategory, flowBalanceMetric, stationProperties, heatmapColor};
   root.StationStyle = api;
   if (typeof module !== "undefined") module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
