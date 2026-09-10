@@ -74,6 +74,19 @@ def integer(value, label, optional=False):
     return int(number)
 
 
+def rounded_distance(value, optional=False):
+    value = (value or "").strip().replace(",", ".")
+    if optional and not value:
+        return 0
+    number = float(value)
+    if number < 0:
+        raise ValueError(f"invalid distance {value!r}")
+    try:
+        return round(number)
+    except (OverflowError, ValueError):
+        raise ValueError(f"invalid distance {value!r}") from None
+
+
 def open_csv(path):
     if zipfile.is_zipfile(path):
         archive = zipfile.ZipFile(path)
@@ -118,7 +131,7 @@ def build(source):
                 origin = integer(row[columns["origin"]], "origin station ID")
                 destination = integer(row[columns["destination"]], "destination station ID")
                 duration = integer(row.get(columns["duration"]) if columns["duration"] else "", "duration", True)
-                distance = integer(row.get(columns["distance"]) if columns["distance"] else "", "distance", True)
+                distance = rounded_distance(row.get(columns["distance"]) if columns["distance"] else "", True)
                 if month is None:
                     month = current_month
                 elif current_month != month:

@@ -39,7 +39,7 @@ def build(source, return_stats=False):
                     "origin": build_data.integer(row[columns["origin"]], "origin station ID"),
                     "destination": build_data.integer(row[columns["destination"]], "destination station ID"),
                     "durationS": build_data.integer(row[columns["duration"]], "duration"),
-                    "distanceM": build_data.integer(row[columns["distance"]], "distance"),
+                    "distanceM": build_data.rounded_distance(row[columns["distance"]]),
                 }
                 current_month = (departure.year, departure.month)
                 if month is None:
