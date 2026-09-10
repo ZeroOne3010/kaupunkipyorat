@@ -42,6 +42,16 @@ class BuildDataTests(unittest.TestCase):
 
         self.assertEqual(result["total"], [[2, 3, 1, 567, 1000]])
 
+    def test_fractional_distance_is_rounded_to_nearest_meter(self):
+        result, stats, warnings = self.build_csv(
+            "Departure,Departure station id,Return station id,Covered distance (m),Duration (sec.)\n"
+            "2025-07-01T00:00:00,1,2,6758.33,120\n"
+        )
+
+        self.assertEqual(result["total"], [[1, 2, 1, 120, 6758]])
+        self.assertEqual(stats[:3], (1, 1, 0))
+        self.assertEqual(warnings, "")
+
 
 if __name__ == "__main__":
     unittest.main()

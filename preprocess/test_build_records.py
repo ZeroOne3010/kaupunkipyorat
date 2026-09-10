@@ -48,6 +48,14 @@ class BuildRecordsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "no valid rides found"):
                 records.build(source)
 
+    def test_fractional_distance_is_rounded_to_nearest_meter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "rides.csv"
+            source.write_text(HEADER + "2025-06-01T10:00:00,1,2,6758.33,600\n")
+            result = records.build(source)
+
+        self.assertEqual(result["longestDistance"][0]["distanceM"], 6758)
+
 
 if __name__ == "__main__":
     unittest.main()

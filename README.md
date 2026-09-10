@@ -39,6 +39,7 @@ inside a ZIP. It recognizes the published HSL English headers (such as
 `Departure`, `Departure station id`, `Return station id`, `Covered distance (m)`,
 and `Duration (sec.)`) plus common Finnish equivalents. Malformed rows are warned
 about and skipped. Missing optional duration or distance values contribute zero.
+Distances may contain decimal meters and are rounded to the nearest integer meter.
 
 ## Data format
 
