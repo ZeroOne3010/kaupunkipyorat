@@ -308,7 +308,7 @@ async function prepareInsights() {
   }
 }
 
-function renderInsights() {
+function renderInsights(focusToggleKey) {
   const result = insightCache.get(monthKey(selectedDate));
   const rides = MonthlyInsights.records(result);
   const list = document.querySelector("#insights-list");
@@ -343,6 +343,10 @@ function renderInsights() {
     }
     return container;
   }));
+  if (focusToggleKey) {
+    [...list.querySelectorAll("[data-expand-insight]")]
+      .find(toggle => toggle.dataset.expandInsight === focusToggleKey)?.focus();
+  }
   return rides;
 }
 
@@ -402,7 +406,7 @@ document.querySelector("#insights-list").addEventListener("click", event => {
   if (toggle) {
     const key = toggle.dataset.expandInsight;
     if (expandedInsights.has(key)) expandedInsights.delete(key); else expandedInsights.add(key);
-    renderInsights();
+    renderInsights(key);
     return;
   }
   const button = event.target.closest("[data-insight-id]");
