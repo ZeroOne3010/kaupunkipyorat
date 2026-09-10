@@ -216,9 +216,7 @@ map.on("load", async () => {
       "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 10, 1.5, 12, 2.4],
       "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 8, 18, 10, 28, 12, 40],
       "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 11.5, 0.9, 12.5, 0],
-      "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
-        0, "rgba(255,255,255,0)", 0.08, StationStyle.COLORS[category], 1, StationStyle.COLORS[category]
-      ]
+      "heatmap-color": StationStyle.heatmapColor(category)
     }
   }));
   map.addLayer({id: "stations", type: "circle", source: "stations", minzoom: 11.5, paint: {
