@@ -33,7 +33,11 @@
   }
 
   function records(data) {
-    return definitions.flatMap(([key, label]) => data && data[key] ? [{key, label, ...data[key]}] : []);
+    return definitions.flatMap(([key, label]) => {
+      if (!data || !data[key]) return [];
+      const rides = Array.isArray(data[key]) ? data[key] : [data[key]];
+      return rides.map((ride, index) => ({key, id: `${key}:${index}`, rank: index + 1, label, ...ride}));
+    });
   }
 
   return {definitions, details, distance, duration, records};

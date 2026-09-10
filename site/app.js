@@ -7,6 +7,7 @@ let availableMonths = new Map();
 let insightRide = null;
 let insightPreviousView = null;
 const insightCache = new Map();
+const expandedInsights = new Set();
 const {availableMonthTarget, monthKey, shiftedDate} = TimeNavigation;
 
 const map = new maplibregl.Map({
@@ -307,28 +308,51 @@ async function prepareInsights() {
   }
 }
 
+function renderInsights() {
+  const result = insightCache.get(monthKey(selectedDate));
+  const rides = MonthlyInsights.records(result);
+  const list = document.querySelector("#insights-list");
+  const groups = MonthlyInsights.definitions.map(([key]) => rides.filter(ride => ride.key === key)).filter(group => group.length);
+  list.replaceChildren(...groups.map(group => {
+    const container = document.createElement("div");
+    container.className = "insight-group";
+    const visible = expandedInsights.has(group[0].key) ? group : group.slice(0, 1);
+    container.append(...visible.map(ride => {
+      const origin = stationById.get(Number(ride.origin));
+      const destination = stationById.get(Number(ride.destination));
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "insight-row";
+      button.disabled = !origin || !destination;
+      button.dataset.insightId = ride.id;
+      const label = document.createElement("span"); label.className = "insight-label"; label.textContent = `${ride.label}${group.length > 1 ? ` #${ride.rank}` : ""}`;
+      const route = document.createElement("span"); route.className = "insight-route"; route.textContent = `${origin?.name || ride.origin} → ${destination?.name || ride.destination}`;
+      const details = document.createElement("span"); details.className = "insight-details"; details.textContent = MonthlyInsights.details(ride.key, ride);
+      button.append(label, route, details);
+      return button;
+    }));
+    if (group.length > 1) {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "insight-expand";
+      toggle.dataset.expandInsight = group[0].key;
+      const expanded = expandedInsights.has(group[0].key);
+      toggle.setAttribute("aria-expanded", String(expanded));
+      toggle.textContent = expanded ? "Show only the record" : `Show all ${group.length}`;
+      container.append(toggle);
+    }
+    return container;
+  }));
+  return rides;
+}
+
 function showInsights() {
   if (insightRide) {
     closeInsightVisualization();
     return;
   }
-  const result = insightCache.get(monthKey(selectedDate));
-  const rides = MonthlyInsights.records(result);
-  const list = document.querySelector("#insights-list");
-  list.replaceChildren(...rides.map(ride => {
-    const origin = stationById.get(Number(ride.origin));
-    const destination = stationById.get(Number(ride.destination));
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "insight-row";
-    button.disabled = !origin || !destination;
-    button.dataset.insightKey = ride.key;
-    const label = document.createElement("span"); label.className = "insight-label"; label.textContent = ride.label;
-    const route = document.createElement("span"); route.className = "insight-route"; route.textContent = `${origin?.name || ride.origin} → ${destination?.name || ride.destination}`;
-    const details = document.createElement("span"); details.className = "insight-details"; details.textContent = MonthlyInsights.details(ride.key, ride);
-    button.append(label, route, details);
-    return button;
-  }));
+  expandedInsights.clear();
+  const rides = renderInsights();
   document.querySelector("#insights-month").textContent = `${selectedDate.toLocaleDateString(undefined, {month: "long", year: "numeric", timeZone: "UTC"})} — Monthly insights`;
   document.querySelector("#insights-unavailable").hidden = rides.length > 0;
   document.querySelector("#insights-panel").hidden = false;
@@ -374,9 +398,16 @@ document.querySelector("#open-insights").addEventListener("click", showInsights)
 document.querySelector("#close-insights").addEventListener("click", hideInsights);
 document.querySelector("#insights-backdrop").addEventListener("click", hideInsights);
 document.querySelector("#insights-list").addEventListener("click", event => {
-  const button = event.target.closest("[data-insight-key]");
+  const toggle = event.target.closest("[data-expand-insight]");
+  if (toggle) {
+    const key = toggle.dataset.expandInsight;
+    if (expandedInsights.has(key)) expandedInsights.delete(key); else expandedInsights.add(key);
+    renderInsights();
+    return;
+  }
+  const button = event.target.closest("[data-insight-id]");
   if (!button) return;
-  const ride = MonthlyInsights.records(insightCache.get(monthKey(selectedDate))).find(item => item.key === button.dataset.insightKey);
+  const ride = MonthlyInsights.records(insightCache.get(monthKey(selectedDate))).find(item => item.id === button.dataset.insightId);
   if (ride) visualizeInsight(ride);
 });
 document.addEventListener("keydown", event => {

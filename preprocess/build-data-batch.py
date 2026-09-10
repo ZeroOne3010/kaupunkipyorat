@@ -52,7 +52,7 @@ def build_all(source, output_directory, kind="aggregate"):
     with tempfile.TemporaryDirectory() as directory:
         for csv_source in csv_sources(source, Path(directory)):
             if kind == "records":
-                result, stats = build_records.build(csv_source), None
+                result, stats = build_records.build(csv_source, return_stats=True)
             else:
                 result, stats = build_data.build(csv_source)
             month = (result["y"], result["m"])
@@ -67,10 +67,13 @@ def build_all(source, output_directory, kind="aggregate"):
         destination = output_directory / filename
         destination.write_text(json.dumps(result, separators=(",", ":")) + "\n", encoding="utf-8")
         outputs.append(destination)
-        print(
-            f"Built {destination}" + (f": {stats[1]} valid rides, {stats[2]} skipped rows, "
-            f"{stats[3]} OD pairs" if stats else "")
-        )
+        if kind == "records":
+            excluded = stats["excludedLong"]
+            percentage = excluded / stats["considered"] * 100 if stats["considered"] else 0
+            detail = f": excluded {excluded} rides over 24 hours ({percentage:.2f}% of {stats['considered']} considered rides)"
+        else:
+            detail = f": {stats[1]} valid rides, {stats[2]} skipped rows, {stats[3]} OD pairs"
+        print(f"Built {destination}{detail}")
     return outputs
 
 
