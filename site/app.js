@@ -22,13 +22,17 @@ map.addControl(new maplibregl.AttributionControl({compact: true}), "top-right");
 
 function stationGeoJSON(tuples = []) {
   const balances = StationBalance.stationBalances(STATIONS, tuples);
+  const coloring = document.querySelector('input[name="coloring"]:checked').value;
+  const maxBusyness = Math.max(0, ...[...balances.values()].map(StationBalance.stationBusyness));
+  const metric = coloring === "busyness" ? StationStyle.busynessMetric(maxBusyness) : StationStyle.flowBalanceMetric;
   return {type: "FeatureCollection", features: STATIONS.map(([id, name, lat, lon]) => ({
     type: "Feature", properties: {
       id,
       name,
       selected: id === selectedId,
       insight: insightRide && (id === insightRide.origin || id === insightRide.destination),
-      ...StationStyle.stationProperties(StationStyle.flowBalanceMetric, balances.get(id))
+      coloring,
+      ...StationStyle.stationProperties(metric, balances.get(id))
     }, geometry: {type: "Point", coordinates: [lon, lat]}
   }))};
 }
@@ -125,6 +129,15 @@ function update() {
   updateTimeDisplay();
   const direction = document.querySelector('input[name="direction"]:checked').value;
   const tuples = currentTuples();
+  const coloring = document.querySelector('input[name="coloring"]:checked').value;
+  document.querySelector("#balance-legend").hidden = coloring !== "flow";
+  document.querySelector("#busyness-legend").hidden = coloring !== "busyness";
+  if (map.getLayer("station-heat-busyness")) {
+    map.setLayoutProperty("station-heat-busyness", "visibility", coloring === "busyness" ? "visible" : "none");
+    ["neutral", "negative-low", "positive-low", "negative", "positive", "negative-strong", "positive-strong"].forEach(category => {
+      map.setLayoutProperty(`station-heat-${category}`, "visibility", coloring === "flow" ? "visible" : "none");
+    });
+  }
   let shown = tuples.filter(([origin, destination, count]) => {
     if (count < minimumRideCount()) return false;
     if (selectedId === null) return true;
@@ -219,10 +232,20 @@ map.on("load", async () => {
       "heatmap-color": StationStyle.heatmapColor(category)
     }
   }));
+  map.addLayer({id: "station-heat-busyness", type: "heatmap", source: "stations", maxzoom: 12.5,
+    filter: ["==", ["get", "colorCategory"], "busyness"], layout: {visibility: "none"}, paint: {
+      "heatmap-weight": ["get", "normalizedBusyness"],
+      "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 10, 1.5, 12, 2.4],
+      "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 8, 18, 10, 28, 12, 40],
+      "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 11.5, 0.9, 12.5, 0],
+      "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
+        0, "rgba(217,240,240,0)", 0.15, "rgba(156,207,211,.25)", 0.45, "rgba(91,143,184,.48)", 1, "rgba(91,42,134,.78)"]
+    }});
   map.addLayer({id: "stations", type: "circle", source: "stations", minzoom: 11.5, paint: {
     "circle-radius": ["case", ["get", "selected"], 9, 6],
-    "circle-color": ["match", ["get", "colorCategory"],
-      ...Object.entries(StationStyle.COLORS).flat(), StationStyle.COLORS.neutral],
+    "circle-color": ["case", ["==", ["get", "coloring"], "busyness"],
+      ["interpolate", ["linear"], ["get", "normalizedBusyness"], 0, StationStyle.BUSYNESS_COLORS.low, 1, StationStyle.BUSYNESS_COLORS.high],
+      ["match", ["get", "colorCategory"], ...Object.entries(StationStyle.COLORS).flat(), StationStyle.COLORS.neutral]],
     "circle-opacity": ["interpolate", ["linear"], ["zoom"], 11.5, 0, 12, 1],
     "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 11.5, 0, 12, 1],
     "circle-stroke-color": ["case", ["get", "selected"], "#ed6a00", "#17324d"],
@@ -256,6 +279,7 @@ map.on("load", async () => {
 
 document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="direction"]').forEach(input => input.addEventListener("change", update));
+document.querySelectorAll('input[name="coloring"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll(".time-navigation button").forEach(button => button.addEventListener("click", () => {
   navigateTime(button.dataset.unit, Number(button.dataset.step));
 }));

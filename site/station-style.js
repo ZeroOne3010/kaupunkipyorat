@@ -28,6 +28,20 @@
     }
   };
 
+  const BUSYNESS_COLORS = {low: "#d9f0f0", high: "#5b2a86"};
+
+  function busynessMetric(maxBusyness) {
+    return {
+      properties({arrivals, departures, roundTrips = 0}) {
+        const busyness = arrivals + departures - roundTrips;
+        // A square-root scale preserves differences among quieter stations when
+        // a handful of hubs dominate the selected period.
+        const normalizedBusyness = maxBusyness ? Math.sqrt(busyness / maxBusyness) : 0;
+        return {colorCategory: "busyness", colorWeight: normalizedBusyness, normalizedBusyness, busyness};
+      }
+    };
+  }
+
   function stationProperties(metric, datum) {
     return metric.properties(datum);
   }
@@ -51,7 +65,7 @@
     ];
   }
 
-  const api = {COLORS, divergingCategory, flowBalanceMetric, stationProperties, heatmapColor};
+  const api = {COLORS, BUSYNESS_COLORS, divergingCategory, flowBalanceMetric, busynessMetric, stationProperties, heatmapColor};
   root.StationStyle = api;
   if (typeof module !== "undefined") module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

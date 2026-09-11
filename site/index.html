@@ -68,10 +68,17 @@
           </fieldset>
           <label class="threshold"><span aria-label="Minimum trips">≥</span><input id="threshold" type="number" min="1" step="1" value="5" inputmode="numeric" aria-label="Minimum trips"></label>
         </div>
+        <div class="color-row">
+          <span>Color</span>
+          <fieldset class="segments color-control"><legend class="visually-hidden">Station coloring</legend>
+            <label><input type="radio" name="coloring" value="flow" checked> Net flow</label>
+            <label><input type="radio" name="coloring" value="busyness"> Busyness</label>
+          </fieldset>
+        </div>
       </div>
       <p id="all-rides" class="status">—</p>
       <p id="data-notice" class="data-notice" role="status" aria-live="polite"></p>
-      <div class="balance-legend" aria-label="Station bike balance legend">
+      <div id="balance-legend" class="balance-legend" aria-label="Station bike balance legend">
         <span><i class="swatch negative-strong"></i>More departures</span>
         <span><i class="swatch negative"></i></span>
         <span><i class="swatch negative-low"></i></span>
@@ -79,6 +86,9 @@
         <span><i class="swatch positive-low"></i></span>
         <span><i class="swatch positive"></i></span>
         <span><i class="swatch positive-strong"></i>More arrivals</span>
+      </div>
+      <div id="busyness-legend" class="busyness-legend" aria-label="Station busyness legend" hidden>
+        <span>Less busy</span><i aria-hidden="true"></i><span>More busy</span>
       </div>
       <p class="hint">Select a station for its busiest origins and destinations.</p>
     </div>

@@ -1,12 +1,21 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {divergingCategory, flowBalanceMetric, stationProperties, heatmapColor} = require("./station-style.js");
+const {divergingCategory, flowBalanceMetric, busynessMetric, stationProperties, heatmapColor} = require("./station-style.js");
 
 test("divergingCategory supports configurable, symmetric bands", () => {
   assert.equal(divergingCategory(0.1, [0.1, 0.2, 0.4]), "neutral");
   assert.equal(divergingCategory(-0.11, [0.1, 0.2, 0.4]), "negative-low");
   assert.equal(divergingCategory(0.3, [0.1, 0.2, 0.4]), "positive");
   assert.equal(divergingCategory(-0.5, [0.1, 0.2, 0.4]), "negative-strong");
+});
+
+test("busyness uses a square-root scale and maps the busiest station to one", () => {
+  assert.deepEqual(stationProperties(busynessMetric(100), {arrivals: 50, departures: 50, roundTrips: 0}), {
+    colorCategory: "busyness", colorWeight: 1, normalizedBusyness: 1, busyness: 100
+  });
+  assert.deepEqual(stationProperties(busynessMetric(100), {arrivals: 13, departures: 16, roundTrips: 4}), {
+    colorCategory: "busyness", colorWeight: 0.5, normalizedBusyness: 0.5, busyness: 25
+  });
 });
 
 test("stationProperties delegates styling to the selected metric", () => {

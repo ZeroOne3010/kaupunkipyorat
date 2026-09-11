@@ -41,6 +41,9 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .navigation-gap { width: 6px; }
 .filter-row { display: flex; align-items: center; gap: 9px; }
 .direction-control { flex: 1 1 auto; }
+.color-row { display: flex; align-items: center; gap: 9px; color: #526a7e; font-size: 12px; font-weight: 700; }
+.color-control { width: 190px; }
+.color-control label { padding-block: 5px; }
 .threshold { display: flex; align-items: center; gap: 3px; font-size: 16px; font-weight: 750; }
 select, input[type="number"] { box-sizing: border-box; min-height: 34px; border: 1px solid #aab9c5; border-radius: 6px; background: #fff; color: inherit; padding: 5px 6px; font: inherit; }
 .threshold input { width: 54px; text-align: center; }
@@ -49,6 +52,8 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .data-notice:empty { display: none; }
 .balance-legend { display: grid; grid-template-columns: auto repeat(5, 12px) auto; align-items: center; justify-content: space-between; gap: 3px; color: #526a7e; font-size: 10px; }
 .balance-legend span { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.busyness-legend { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; color: #526a7e; font-size: 10px; }
+.busyness-legend i { height: 8px; border: 1px solid #73889a; border-radius: 999px; background: linear-gradient(90deg, #d9f0f0, #9ccfd3, #5b8fb8, #5b2a86); }
 .swatch { display: inline-block; width: 10px; height: 10px; border: 1px solid #17324d; border-radius: 50%; }
 .swatch.negative-strong { background: #c7384f; }
 .swatch.negative { background: #dc6670; }
