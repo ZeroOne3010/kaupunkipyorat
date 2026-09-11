@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {stationBalances, balanceCategory} = require("./station-balance.js");
+const {stationBalances, stationBusyness, balanceCategory} = require("./station-balance.js");
 
 test("stationBalances counts arrivals and departures for known stations", () => {
   const balances = stationBalances([[1], [2], [3]], [
@@ -10,9 +10,15 @@ test("stationBalances counts arrivals and departures for known stations", () => 
     [99, 2, 3]
   ]);
 
-  assert.deepEqual(balances.get(1), {arrivals: 2, departures: 9});
-  assert.deepEqual(balances.get(2), {arrivals: 8, departures: 0});
-  assert.deepEqual(balances.get(3), {arrivals: 0, departures: 2});
+  assert.deepEqual(balances.get(1), {arrivals: 2, departures: 9, roundTrips: 0});
+  assert.deepEqual(balances.get(2), {arrivals: 8, departures: 0, roundTrips: 0});
+  assert.deepEqual(balances.get(3), {arrivals: 0, departures: 2, roundTrips: 0});
+});
+
+test("station busyness counts a same-station ride once", () => {
+  const balances = stationBalances([[1], [2]], [[1, 1, 4], [1, 2, 3]]);
+  assert.deepEqual(balances.get(1), {arrivals: 4, departures: 7, roundTrips: 4});
+  assert.equal(stationBusyness(balances.get(1)), 7);
 });
 
 test("balanceCategory uses a five percent neutral threshold and three levels per direction", () => {
