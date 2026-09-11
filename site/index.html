@@ -75,6 +75,13 @@
             <label><input type="radio" name="coloring" value="busyness"> Busyness</label>
           </fieldset>
         </div>
+        <div class="geometry-row">
+          <span>Connections</span>
+          <fieldset class="segments geometry-control"><legend class="visually-hidden">Connection geometry</legend>
+            <label><input type="radio" name="geometry" value="straight" checked> Straight</label>
+            <label><input type="radio" name="geometry" value="routes"> Routes</label>
+          </fieldset>
+        </div>
       </div>
       <p id="all-rides" class="status">—</p>
       <p id="data-notice" class="data-notice" role="status" aria-live="polite"></p>
@@ -111,6 +118,7 @@
   <script src="station-balance.js"></script>
   <script src="station-summary.js"></script>
   <script src="monthly-insights.js"></script>
+  <script src="route-geometry.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

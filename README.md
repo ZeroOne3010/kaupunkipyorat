@@ -76,6 +76,28 @@ DIGITRANSIT_SUBSCRIPTION_KEY=... \
   python preprocess/build-stations.py site/stations.js
 ```
 
+## Bicycle route geometry
+
+Straight station-to-station connections remain the default. The **Connections →
+Routes** control loads `site/routes/<selected-station-id>.json` on demand and uses
+its Digitransit bicycle geometry for outgoing flows. Missing files and missing
+individual routes fall back to straight lines.
+
+To generate a bounded checkpoint, add the `DIGITRANSIT_SUBSCRIPTION_KEY` secret
+and run **Actions → Build bicycle routes → Run workflow**. The defaults start at
+station index 0 in `site/stations.js`, process one station, and wait 750 ms between
+sequential requests. The workflow discovers required directed routes by scanning
+all aggregate files in `site/data/`; it does not maintain a separate route list.
+Download the artifact and copy its `routes/` directory into `site/routes/` to use
+the generated files. Generated routes are never committed by the workflow.
+
+The same bounded build can be run locally:
+
+```sh
+DIGITRANSIT_SUBSCRIPTION_KEY=... \
+  python preprocess/build-routes.py --start-station-index 0 --max-stations 1 --delay-ms 750
+```
+
 Trip CSVs are published through [HSL's open data resources](https://www.hsl.fi/en/hsl/open-data).
 
 ## Deployment
@@ -85,18 +107,17 @@ Enable **GitHub Actions** as the Pages source in repository settings once.
 
 ## MVP limitations / future work
 
-- realistic cycling routes
-- route geometry preprocessing
+- complete pre-generated cycling route coverage
 - animations/particles
 - PMTiles/vector tiles
 - weather joins
 - advanced statistics
 - automatic ingestion of newly published months
 
-Only stations present in the committed station snapshot can be drawn, flows are
-straight lines, and the UI provides basic filtering rather than analysis. Map
-tiles are fetched from a third party; station metadata and trip aggregates are
-static files.
+Only stations present in the committed station snapshot can be drawn. Routed
+flows require separately generated route files and otherwise fall back to straight
+lines. Map tiles are fetched from a third party; station metadata and trip
+aggregates are static files.
 
 ## Licenses
 
