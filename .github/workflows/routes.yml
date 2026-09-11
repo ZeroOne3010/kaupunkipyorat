@@ -18,6 +18,11 @@ on:
         required: true
         default: "750"
         type: string
+      max_consecutive_failures:
+        description: Stop after this many requests fail in a row
+        required: true
+        default: "3"
+        type: string
 
 permissions:
   contents: read
@@ -38,10 +43,12 @@ jobs:
           --start-station-index "${{ inputs.start_station_index }}"
           --max-stations "${{ inputs.max_stations }}"
           --delay-ms "${{ inputs.delay_ms }}"
+          --max-consecutive-failures "${{ inputs.max_consecutive_failures }}"
           --output output
       - name: Validate output
         run: python -m json.tool output/routing-summary.json >/dev/null
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: hsl-city-bike-routes-${{ inputs.start_station_index }}
           path: |

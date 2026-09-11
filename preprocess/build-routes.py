@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 DEFAULT_ENDPOINT = "https://api.digitransit.fi/routing/v2/hsl/gtfs/v1"
-QUERY = """query BicycleRoute($from: InputCoordinates!, $to: InputCoordinates!) {
+QUERY = """query BicycleRoute($from: PlanCoordinateInput!, $to: PlanCoordinateInput!) {
   planConnection(
     origin: {location: {coordinate: $from}}
     destination: {location: {coordinate: $to}}
@@ -99,11 +99,14 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
     parser.add_argument("--start-station-index", type=int, default=0)
     parser.add_argument("--max-stations", type=int, default=1)
     parser.add_argument("--delay-ms", type=int, default=750)
+    parser.add_argument("--max-consecutive-failures", type=int, default=3,
+                        help="stop after this many consecutive failed requests")
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT)
     parser.add_argument("--subscription-key", default=None)
     args = parser.parse_args(argv)
-    if args.start_station_index < 0 or args.max_stations < 1 or args.delay_ms < 0:
-        parser.error("start station index and delay must be non-negative; max stations must be positive")
+    if (args.start_station_index < 0 or args.max_stations < 1 or args.delay_ms < 0
+            or args.max_consecutive_failures < 1):
+        parser.error("start station index and delay must be non-negative; maximums must be positive")
 
     try:
         stations = load_stations(args.stations)
@@ -127,8 +130,11 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
     print(f"Estimated minimum delay time: {format_duration(total * args.delay_ms)}")
     by_id = {row[0]: row for row in stations}
     summary = {"startStationIndex": args.start_station_index, "stationsProcessed": 0,
-               "routesAttempted": 0, "routesSucceeded": 0, "routesFailed": 0, "failedRoutes": []}
+               "routesAttempted": 0, "routesSucceeded": 0, "routesFailed": 0,
+               "failedRoutes": [], "stoppedEarly": False}
     retry_waits = (2, 5)
+    consecutive_failures = 0
+    stop_requested = False
     for index, origin in enumerate(selected, args.start_station_index):
         destinations = sorted(required[origin[0]])
         print(f"\nProcessing station index {index}\nStation: {origin[1]} (ID {origin[0]})")
@@ -145,25 +151,39 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
                     station_output["out"][str(destination_id)] = request_fn(args.endpoint, key, origin, by_id[destination_id])
                     write_json(output_path, station_output)
                     summary["routesSucceeded"] += 1
+                    consecutive_failures = 0
                     success = True
                     break
                 except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError, urllib.error.HTTPError) as error:
                     print(f"Route {origin[0]} -> {destination_id} failed: {error}", file=sys.stderr, flush=True)
+                    consecutive_failures += 1
+                    if consecutive_failures >= args.max_consecutive_failures:
+                        summary["stoppedEarly"] = True
+                        summary["stopReason"] = (f"reached {args.max_consecutive_failures} "
+                                                 "consecutive failed requests")
+                        stop_requested = True
+                        print(f"Stopping early: {summary['stopReason']}", file=sys.stderr, flush=True)
+                        break
                     if attempt < 2:
                         print(f"Waiting {retry_waits[attempt]} s before retry", flush=True)
                         sleep_fn(retry_waits[attempt])
             if not success:
                 summary["routesFailed"] += 1
                 summary["failedRoutes"].append([origin[0], destination_id])
+            if stop_requested:
+                break
             if route_index + 1 < len(destinations):
                 sleep_fn(args.delay_ms / 1000)
-        summary["stationsProcessed"] += 1
+        if not stop_requested:
+            summary["stationsProcessed"] += 1
         write_json(args.output / "routing-summary.json", summary)
+        if stop_requested:
+            break
     print(f"\nStations processed: {summary['stationsProcessed']}")
     print(f"Routes attempted: {summary['routesAttempted']}")
     print(f"Routes succeeded: {summary['routesSucceeded']}")
     print(f"Routes failed: {summary['routesFailed']}")
-    return 0
+    return 1 if stop_requested else 0
 
 
 if __name__ == "__main__":
