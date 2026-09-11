@@ -41,9 +41,10 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .navigation-gap { width: 6px; }
 .filter-row { display: flex; align-items: center; gap: 9px; }
 .direction-control { flex: 1 1 auto; }
-.color-row { display: flex; align-items: center; gap: 9px; color: #526a7e; font-size: 12px; font-weight: 700; }
+.color-row, .geometry-row { display: flex; align-items: center; gap: 9px; color: #526a7e; font-size: 12px; font-weight: 700; }
 .color-control { width: 190px; }
-.color-control label { padding-block: 5px; }
+.color-control label, .geometry-control label { padding-block: 5px; }
+.geometry-control { width: 160px; }
 .threshold { display: flex; align-items: center; gap: 3px; font-size: 16px; font-weight: 750; }
 select, input[type="number"] { box-sizing: border-box; min-height: 34px; border: 1px solid #aab9c5; border-radius: 6px; background: #fff; color: inherit; padding: 5px 6px; font: inherit; }
 .threshold input { width: 54px; text-align: center; }

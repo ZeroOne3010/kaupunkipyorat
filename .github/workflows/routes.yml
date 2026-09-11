@@ -1,0 +1,50 @@
+name: Build bicycle routes
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_station_index:
+        description: Zero-based position in site/stations.js
+        required: true
+        default: "0"
+        type: string
+      max_stations:
+        description: Number of consecutive stations to process
+        required: true
+        default: "1"
+        type: string
+      delay_ms:
+        description: Delay between sequential route requests in milliseconds
+        required: true
+        default: "750"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build routed geometries
+        env:
+          DIGITRANSIT_SUBSCRIPTION_KEY: ${{ secrets.DIGITRANSIT_SUBSCRIPTION_KEY }}
+        run: >-
+          python preprocess/build-routes.py
+          --start-station-index "${{ inputs.start_station_index }}"
+          --max-stations "${{ inputs.max_stations }}"
+          --delay-ms "${{ inputs.delay_ms }}"
+          --output output
+      - name: Validate output
+        run: python -m json.tool output/routing-summary.json >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hsl-city-bike-routes-${{ inputs.start_station_index }}
+          path: |
+            output/routes
+            output/routing-summary.json
+          if-no-files-found: error

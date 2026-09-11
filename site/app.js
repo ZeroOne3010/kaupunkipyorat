@@ -8,6 +8,10 @@ let insightRide = null;
 let insightPreviousView = null;
 const insightCache = new Map();
 const expandedInsights = new Set();
+const routeCache = new Map();
+const routeRequests = new Map();
+const unavailableRoutes = new Set();
+const decodedRouteCache = new Map();
 const {availableMonthTarget, monthKey, shiftedDate} = TimeNavigation;
 
 const map = new maplibregl.Map({
@@ -124,6 +128,28 @@ function navigationTarget(unit, amount) {
   return availableMonthTarget(selectedDate, amount, [...availableMonths.keys()]);
 }
 
+function routedGeometryEnabled() {
+  return document.querySelector('input[name="geometry"]:checked').value === "routes";
+}
+
+async function loadSelectedRoutes() {
+  const stationId = selectedId;
+  if (!routedGeometryEnabled() || stationId === null || routeCache.has(stationId) || unavailableRoutes.has(stationId)) return;
+  if (!routeRequests.has(stationId)) {
+    routeRequests.set(stationId, fetch(`routes/${stationId}.json`).then(async response => {
+      if (!response.ok) {
+        unavailableRoutes.add(stationId);
+        return;
+      }
+      const routes = await response.json();
+      if (routes?.v === 1 && routes.station === stationId && routes.out) routeCache.set(stationId, routes);
+      else unavailableRoutes.add(stationId);
+    }).catch(() => unavailableRoutes.add(stationId)).finally(() => routeRequests.delete(stationId)));
+  }
+  await routeRequests.get(stationId);
+  if (routeCache.has(stationId) && selectedId === stationId && routedGeometryEnabled()) update();
+}
+
 function update() {
   if (!data || !selectedDate || !map.getSource("flows")) return;
   updateTimeDisplay();
@@ -144,11 +170,13 @@ function update() {
     return (direction !== "incoming" && origin === selectedId) || (direction !== "outgoing" && destination === selectedId);
   });
   shown = shown.filter(([origin, destination]) => stationById.has(origin) && stationById.has(destination));
+  const selectedRoutes = routedGeometryEnabled() && selectedId !== null ? routeCache.get(selectedId) : null;
   map.getSource("flows").setData({type: "FeatureCollection", features: shown.map(([origin, destination, count]) => ({
-    type: "Feature", properties: {count, scale: FlowStyle.rideCountScale(count)}, geometry: {type: "LineString", coordinates: [
-      [stationById.get(origin).lon, stationById.get(origin).lat], [stationById.get(destination).lon, stationById.get(destination).lat]
-    ]}
+    type: "Feature", properties: {count, scale: FlowStyle.rideCountScale(count)}, geometry: {type: "LineString", coordinates:
+      RouteGeometry.connectionCoordinates(stationById.get(origin), stationById.get(destination), selectedId, selectedRoutes, decodedRouteCache)
+    }
   }))});
+  loadSelectedRoutes();
   map.getSource("stations").setData(stationGeoJSON(tuples));
   const rideCount = shown.reduce((sum, tuple) => sum + tuple[2], 0);
   const rides = `${rideCount.toLocaleString()} rides`;
@@ -280,6 +308,7 @@ map.on("load", async () => {
 document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="direction"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="coloring"]').forEach(input => input.addEventListener("change", update));
+document.querySelectorAll('input[name="geometry"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll(".time-navigation button").forEach(button => button.addEventListener("click", () => {
   navigateTime(button.dataset.unit, Number(button.dataset.step));
 }));
