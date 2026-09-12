@@ -16,15 +16,19 @@ test("uses outgoing routes and caches decoded geometry", () => {
   const first = Routes.connectionCoordinates(origin, destination, 17, file, cache);
   assert.equal(cache.size, 1);
   assert.equal(Routes.connectionCoordinates(origin, destination, 17, file, cache), first);
-  assert.equal(Routes.connectionCoordinates(destination, origin, 17, file, cache), null);
+  assert.deepEqual(Routes.connectionCoordinates(destination, origin, 17, file, cache), [
+    [-126.453, 43.252], [-120.95, 40.7], [-120.2, 38.5]
+  ]);
   assert.equal(cache.size, 1);
 });
 
-test("omits incoming connections when only the selected station's outgoing routes are loaded", () => {
+test("reverses the selected station's route for incoming connections", () => {
   const selected = {id: 1, lat: 60, lon: 24};
   const other = {id: 99, lat: 61, lon: 25};
   const selectedRoutes = {out: {"99": {p: "_p~iF~ps|U_ulLnnqC_mqNvxq`@"}}};
-  assert.equal(Routes.connectionCoordinates(other, selected, 1, selectedRoutes, new Map()), null);
+  assert.deepEqual(Routes.connectionCoordinates(other, selected, 1, selectedRoutes, new Map()), [
+    [-126.453, 43.252], [-120.95, 40.7], [-120.2, 38.5]
+  ]);
 });
 
 test("keeps unrelated connections straight when a station route file is loaded", () => {
