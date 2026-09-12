@@ -21,7 +21,7 @@ class BuildRoutesTests(unittest.TestCase):
         response = io.BytesIO(json.dumps({
             "data": {"planConnection": {"edges": [{"node": {"legs": [{
                 "distance": 123.4,
-                "legGeometry": {"points": "abc"},
+                "legGeometry": {"points": "??"},
             }]}}]}},
         }).encode())
 
@@ -41,12 +41,20 @@ class BuildRoutesTests(unittest.TestCase):
             "from": {"latitude": 60.1, "longitude": 24.9},
             "to": {"latitude": 60.2, "longitude": 25.0},
         })
-        self.assertEqual(result, {"p": "abc", "d": 123})
+        self.assertEqual(result, {"p": "??", "d": 123})
 
-    def test_parse_route_explains_unexpected_leg_count_and_missing_geometry(self):
-        with self.assertRaisesRegex(ValueError, "received 2 legs"):
-            routes.parse_route({"data": {"planConnection": {"edges": [{"node": {"legs": [{}, {}]}}]}}})
-        with self.assertRaisesRegex(ValueError, "leg had no geometry points"):
+    def test_parse_route_concatenates_multiple_legs(self):
+        result = routes.parse_route({"data": {"planConnection": {"edges": [{"node": {"legs": [
+            {"distance": 100.4, "legGeometry": {"points": "_p~iF~ps|U_ulLnnqC"}},
+            {"distance": 200.4, "legGeometry": {"points": "_flwFn`faV_mqNvxq`@"}},
+        ]}}]}}})
+
+        self.assertEqual(result, {"p": "_p~iF~ps|U_ulLnnqC_mqNvxq`@", "d": 301})
+
+    def test_parse_route_explains_empty_legs_and_missing_geometry(self):
+        with self.assertRaisesRegex(ValueError, "contained no legs"):
+            routes.parse_route({"data": {"planConnection": {"edges": [{"node": {"legs": []}}]}}})
+        with self.assertRaisesRegex(ValueError, "leg 1 had no geometry points"):
             routes.parse_route({"data": {"planConnection": {"edges": [{"node": {"legs": [
                 {"distance": 10, "legGeometry": None},
             ]}}]}}})

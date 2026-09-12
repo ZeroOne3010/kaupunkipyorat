@@ -67,6 +67,48 @@ def required_routes(data_directory, station_ids):
     return routes
 
 
+def decode_polyline(encoded, precision=5):
+    """Decode a Google encoded polyline into integer coordinate pairs."""
+    coordinates = []
+    latitude = longitude = index = 0
+    while index < len(encoded):
+        deltas = []
+        for _ in range(2):
+            result = shift = 0
+            while True:
+                if index >= len(encoded):
+                    raise ValueError("invalid encoded polyline")
+                byte = ord(encoded[index]) - 63
+                index += 1
+                if byte < 0 or byte > 63:
+                    raise ValueError("invalid encoded polyline")
+                result |= (byte & 0x1f) << shift
+                shift += 5
+                if byte < 0x20:
+                    break
+            deltas.append(~(result >> 1) if result & 1 else result >> 1)
+        latitude += deltas[0]
+        longitude += deltas[1]
+        coordinates.append((latitude, longitude))
+    return coordinates
+
+
+def encode_polyline(coordinates):
+    """Encode integer coordinate pairs as a Google encoded polyline."""
+    encoded = []
+    previous = [0, 0]
+    for coordinate in coordinates:
+        for axis in range(2):
+            delta = coordinate[axis] - previous[axis]
+            previous[axis] = coordinate[axis]
+            value = ~(delta << 1) if delta < 0 else delta << 1
+            while value >= 0x20:
+                encoded.append(chr((0x20 | (value & 0x1f)) + 63))
+                value >>= 5
+            encoded.append(chr(value + 63))
+    return "".join(encoded)
+
+
 def parse_route(payload):
     if payload.get("errors"):
         raise ValueError("; ".join(error.get("message", str(error)) for error in payload["errors"]))
@@ -74,13 +116,20 @@ def parse_route(payload):
     if not edges:
         raise ValueError("no bicycle itinerary returned")
     legs = edges[0].get("node", {}).get("legs", [])
-    if len(legs) != 1:
-        raise ValueError(f"expected one direct bicycle leg with geometry; received {len(legs)} legs")
-    geometry = legs[0].get("legGeometry") or {}
-    points = geometry.get("points")
-    if not points:
-        raise ValueError("expected one direct bicycle leg with geometry; the leg had no geometry points")
-    return {"p": points, "d": round(float(legs[0]["distance"]))}
+    if not legs:
+        raise ValueError("bicycle itinerary contained no legs")
+    coordinates = []
+    distance = 0
+    for index, leg in enumerate(legs, start=1):
+        points = (leg.get("legGeometry") or {}).get("points")
+        if not points:
+            raise ValueError(f"bicycle itinerary leg {index} had no geometry points")
+        leg_coordinates = decode_polyline(points)
+        if coordinates and leg_coordinates and coordinates[-1] == leg_coordinates[0]:
+            leg_coordinates = leg_coordinates[1:]
+        coordinates.extend(leg_coordinates)
+        distance += float(leg["distance"])
+    return {"p": encode_polyline(coordinates), "d": round(distance)}
 
 
 def request_route(endpoint, subscription_key, origin, destination):
