@@ -12,6 +12,9 @@ const routeCache = new Map();
 const routeRequests = new Map();
 const unavailableRoutes = new Set();
 const decodedRouteCache = new Map();
+let statisticsTupleReference = null;
+let periodStatistics = null;
+let periodRankings = null;
 const {availableMonthTarget, monthKey, shiftedDate} = TimeNavigation;
 
 const map = new maplibregl.Map({
@@ -24,8 +27,8 @@ const map = new maplibregl.Map({
 map.addControl(new maplibregl.NavigationControl(), "top-right");
 map.addControl(new maplibregl.AttributionControl({compact: true}), "top-right");
 
-function stationGeoJSON(tuples = []) {
-  const balances = StationBalance.stationBalances(STATIONS, tuples);
+function stationGeoJSON(tuples = [], statistics = null) {
+  const balances = statistics || StationSummary.aggregateStationStatistics(STATIONS, tuples);
   const coloring = document.querySelector('input[name="coloring"]:checked').value;
   const maxBusyness = Math.max(0, ...[...balances.values()].map(StationBalance.stationBusyness));
   const metric = coloring === "busyness" ? StationStyle.busynessMetric(maxBusyness) : StationStyle.flowBalanceMetric;
@@ -47,6 +50,15 @@ function currentTuples() {
   if (mode === "day") return data.d[dayIndex] || [];
   if (mode === "hour") return data.h[dayIndex * 24 + selectedDate.getUTCHours()] || [];
   return data.total;
+}
+
+function currentStatistics(tuples = currentTuples()) {
+  if (tuples !== statisticsTupleReference) {
+    statisticsTupleReference = tuples;
+    periodStatistics = StationSummary.aggregateStationStatistics(STATIONS, tuples);
+    periodRankings = StationSummary.stationRankings(periodStatistics);
+  }
+  return periodStatistics;
 }
 
 function minimumRideCount() {
@@ -155,6 +167,8 @@ function update() {
   updateTimeDisplay();
   const direction = document.querySelector('input[name="direction"]:checked').value;
   const tuples = currentTuples();
+  const statistics = currentStatistics(tuples);
+  if (!document.querySelector("#rankings-panel").hidden) renderStationRankings();
   const coloring = document.querySelector('input[name="coloring"]:checked').value;
   document.querySelector("#balance-legend").hidden = coloring !== "flow";
   document.querySelector("#busyness-legend").hidden = coloring !== "busyness";
@@ -182,7 +196,7 @@ function update() {
   }).filter(Boolean);
   map.getSource("flows").setData({type: "FeatureCollection", features});
   loadSelectedRoutes();
-  map.getSource("stations").setData(stationGeoJSON(tuples));
+  map.getSource("stations").setData(stationGeoJSON(tuples, statistics));
   const rideCount = features.reduce((sum, feature) => sum + feature.properties.count, 0);
   const rides = `${rideCount.toLocaleString()} rides`;
   document.querySelector("#all-rides").textContent = `${rides} shown`;
@@ -191,9 +205,10 @@ function update() {
   summary.hidden = selectedId === null;
   if (selectedId !== null) {
     document.querySelector("#station").textContent = stationById.get(selectedId).name;
-    const stationStats = StationSummary.stationSummary(selectedId, tuples);
+    const stationStats = StationSummary.summaryFromStatistics(statistics.get(selectedId));
     document.querySelector("#summary-period").textContent = StationSummary.formatPeriod(periodText(), stationStats.trips);
-    const busiest = StationSummary.busiestStationRank(selectedId, STATIONS.map(([id]) => id), tuples);
+    const selectedBusyness = statistics.get(selectedId)?.trips || 0;
+    const busiest = {rank: 1 + [...statistics.values()].filter(stats => stats.trips > selectedBusyness).length, total: statistics.size};
     document.querySelector("#station-rank").textContent = `#${busiest.rank.toLocaleString()} busiest of ${busiest.total.toLocaleString()} stations`;
     document.querySelector("#balance-summary").textContent = `${stationStats.arrivals.toLocaleString()} arrivals · ${stationStats.departures.toLocaleString()} departures · ${StationSummary.formatNetFlow(stationStats.arrivals, stationStats.departures)}`;
     document.querySelector("#average-ride").textContent = stationStats.trips
@@ -304,6 +319,7 @@ map.on("load", async () => {
     selectedDate = new Date(Date.UTC(latest.year, latest.month - 1, 1, 0));
     update();
     prepareInsights();
+    document.querySelector("#open-rankings").disabled = false;
   } catch (error) {
     document.querySelector("#period-label").textContent = `Could not load data: ${error.message}`;
     document.querySelector("#collapsed-status").textContent = "Data unavailable";
@@ -339,6 +355,68 @@ document.querySelector("#toggle-controls").addEventListener("click", event => {
   const collapsed = panel.classList.toggle("collapsed");
   event.currentTarget.setAttribute("aria-expanded", String(!collapsed));
   event.currentTarget.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} map controls`);
+});
+
+const rankingLabels = {
+  busiest: stats => `${stats.trips.toLocaleString()} trips`,
+  roundTrips: stats => `${(stats.roundTripShare * 100).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}% · ${stats.roundTrips.toLocaleString()} / ${stats.trips.toLocaleString()}`,
+  connected: stats => `${stats.connected.toLocaleString()} stations`,
+  concentrated: stats => `${(stats.concentration * 100).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}% · ↔ ${stationById.get(stats.topCounterpartId)?.name || "Unknown"}`,
+  distance: stats => `${(stats.averageDistanceMeters / 1000).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} km avg`,
+  duration: stats => stats.averageDurationSeconds < 600
+    ? `${(stats.averageDurationSeconds / 60).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} min avg`
+    : `${Math.round(stats.averageDurationSeconds / 60).toLocaleString()} min avg`
+};
+
+function renderStationRankings() {
+  currentStatistics();
+  const type = document.querySelector("#ranking-type").value;
+  const rows = periodRankings[type].slice(0, 15);
+  document.querySelector("#rankings-period").textContent = periodText();
+  document.querySelector("#rankings-empty").hidden = rows.length > 0;
+  document.querySelector("#rankings-list").replaceChildren(...rows.map(stats => {
+    const item = document.createElement("li");
+    item.className = `ranking-row${stats.id === selectedId ? " selected" : ""}`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.stationId = stats.id;
+    const name = document.createElement("span"); name.className = "ranking-name"; name.textContent = stationById.get(stats.id)?.name || stats.id;
+    const value = document.createElement("span"); value.className = "ranking-value"; value.textContent = rankingLabels[type](stats);
+    button.append(name, value);
+    button.setAttribute("aria-label", `Select ${name.textContent}, ${value.textContent}`);
+    item.append(button);
+    return item;
+  }));
+}
+
+function hideRankings() {
+  document.querySelector("#rankings-panel").hidden = true;
+  document.querySelector("#rankings-backdrop").hidden = true;
+}
+
+function showRankings() {
+  hideInsights();
+  renderStationRankings();
+  document.querySelector("#rankings-panel").hidden = false;
+  document.querySelector("#rankings-backdrop").hidden = false;
+  document.querySelector("#ranking-type").focus();
+}
+
+document.querySelector("#open-rankings").addEventListener("click", showRankings);
+document.querySelector("#close-rankings").addEventListener("click", hideRankings);
+document.querySelector("#rankings-backdrop").addEventListener("click", hideRankings);
+document.querySelector("#ranking-type").addEventListener("change", renderStationRankings);
+document.querySelector("#rankings-list").addEventListener("click", event => {
+  const button = event.target.closest("button[data-station-id]");
+  if (!button) return;
+  selectedId = Number(button.dataset.stationId);
+  hideRankings();
+  closeInsightVisualization();
+  const station = stationById.get(selectedId);
+  if (station) map.easeTo({center: [station.lon, station.lat], zoom: Math.max(map.getZoom(), 14)});
+  document.querySelector("#station-summary").classList.remove("collapsed");
+  document.querySelector("#toggle-summary").setAttribute("aria-expanded", "true");
+  update();
 });
 
 function recordsUrl() {
@@ -472,4 +550,5 @@ document.querySelector("#insights-list").addEventListener("click", event => {
 });
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !document.querySelector("#insights-panel").hidden) hideInsights();
+  if (event.key === "Escape" && !document.querySelector("#rankings-panel").hidden) hideRankings();
 });

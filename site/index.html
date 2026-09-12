@@ -35,7 +35,7 @@
 
   <section class="panel" aria-label="Map controls">
     <header class="panel-heading">
-      <div class="panel-title"><span class="eyebrow">Helsinki</span><div class="title-row"><h1>City-bike flows</h1><button id="open-insights" class="insights-button" type="button" aria-haspopup="dialog" disabled><span aria-hidden="true">✦</span> Insights</button></div></div>
+      <div class="panel-title"><span class="eyebrow">Helsinki</span><div class="title-row"><h1>City-bike flows</h1><div class="high-level-actions"><button id="open-rankings" class="insights-button" type="button" aria-haspopup="dialog" disabled><span aria-hidden="true">≡</span> Rankings</button><button id="open-insights" class="insights-button" type="button" aria-haspopup="dialog" disabled><span aria-hidden="true">✦</span> Insights</button></div></div></div>
       <p id="collapsed-status" aria-hidden="true">Loading data…</p>
       <div id="collapsed-navigation" class="collapsed-navigation time-navigation" role="group" aria-label="Change selected period">
         <button type="button" data-step="-1" data-unit="month" aria-label="Previous selected period">−1M</button>
@@ -99,6 +99,22 @@
       </div>
       <p class="hint">Select a station for its busiest origins and destinations.</p>
     </div>
+  </section>
+
+  <div id="rankings-backdrop" class="insights-backdrop" hidden></div>
+  <section id="rankings-panel" class="rankings-panel" role="dialog" aria-modal="true" aria-labelledby="rankings-title" hidden>
+    <header class="insights-heading">
+      <div><span class="eyebrow">Station rankings</span><h2 id="rankings-title">Station Rankings</h2></div>
+      <button id="close-rankings" class="icon-button" type="button" aria-label="Close station rankings">×</button>
+    </header>
+    <p id="rankings-period" class="rankings-period">—</p>
+    <label class="ranking-selector"><span class="visually-hidden">Ranking</span><select id="ranking-type">
+      <option value="busiest">Busiest</option><option value="roundTrips">Most round trips (%)</option>
+      <option value="connected">Most connected</option><option value="concentrated">Most concentrated</option>
+      <option value="distance">Longest average ride</option><option value="duration">Longest average duration</option>
+    </select></label>
+    <ol id="rankings-list" class="rankings-list"></ol>
+    <p id="rankings-empty" class="insights-unavailable" hidden>Not enough activity for this ranking in the selected period.</p>
   </section>
 
   <div id="insights-backdrop" class="insights-backdrop" hidden></div>
