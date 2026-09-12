@@ -12,6 +12,11 @@ spec.loader.exec_module(routes)
 
 
 class BuildRoutesTests(unittest.TestCase):
+    @staticmethod
+    def api_error(status):
+        return routes.ApiExchangeError(
+            f"HTTP Error {status}", {"url": "https://example.test"}, {}, status)
+
     def test_request_uses_plan_coordinate_inputs(self):
         response = io.BytesIO(json.dumps({
             "data": {"planConnection": {"edges": [{"node": {"legs": [{
@@ -132,6 +137,60 @@ class BuildRoutesTests(unittest.TestCase):
             self.assertEqual(summary["routesAttempted"], 2)
             self.assertEqual(summary["failedRoutes"], [[1, 2], [1, 3]])
             self.assertEqual(summary["stopReason"], "reached 2 consecutive routes that failed after retries")
+
+    def test_server_errors_are_deferred_until_two_queue_passes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "stations.js").write_text(
+                'const STATIONS = [[1,"One",60,24],[2,"Two",61,25],[3,"Three",62,26]];\n')
+            data = root / "data"; data.mkdir()
+            (data / "a.json").write_text('{"total":[[1,2,1],[1,3,1]]}')
+            calls = []
+            failures_left = {2: 2}
+
+            def request(_endpoint, _key, origin, destination):
+                calls.append((origin[0], destination[0]))
+                if failures_left.get(destination[0], 0):
+                    failures_left[destination[0]] -= 1
+                    raise self.api_error(503)
+                return {"p": "abc", "d": 10}
+
+            waits = []
+            result = routes.main(
+                ["--stations", str(root / "stations.js"), "--data", str(data),
+                 "--output", str(root / "out"), "--subscription-key", "key", "--delay-ms", "0"],
+                request_fn=request, sleep_fn=waits.append)
+
+            summary = json.loads((root / "out/routing-summary.json").read_text())
+            self.assertEqual(result, 0)
+            self.assertEqual(calls, [(1, 2), (1, 3), (1, 2), (1, 2)])
+            self.assertEqual(waits, [1, 0, 30, 1])
+            self.assertEqual(summary["routesSucceeded"], 2)
+            self.assertEqual(summary["routesFailed"], 0)
+            self.assertEqual(summary["serverErrorRetries"], 2)
+
+    def test_three_consecutive_client_errors_stop_immediately(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "stations.js").write_text(
+                'const STATIONS = [[1,"One",60,24],[2,"Two",61,25],[3,"Three",62,26]];\n')
+            data = root / "data"; data.mkdir()
+            (data / "a.json").write_text('{"total":[[1,2,1],[1,3,1]]}')
+            calls = []
+
+            def request(_endpoint, _key, origin, destination):
+                calls.append((origin[0], destination[0]))
+                raise self.api_error(429)
+
+            result = routes.main(
+                ["--stations", str(root / "stations.js"), "--data", str(data),
+                 "--output", str(root / "out"), "--subscription-key", "key"],
+                request_fn=request, sleep_fn=lambda _: None)
+
+            summary = json.loads((root / "out/routing-summary.json").read_text())
+            self.assertEqual(result, 1)
+            self.assertEqual(calls, [(1, 2)] * 3)
+            self.assertEqual(summary["stopReason"], "received 3 consecutive HTTP 4xx responses")
 
 
 if __name__ == "__main__":
