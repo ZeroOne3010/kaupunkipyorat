@@ -80,8 +80,9 @@ DIGITRANSIT_SUBSCRIPTION_KEY=... \
 
 Straight station-to-station connections remain the default. The **Connections →
 Routes** control loads `site/routes/<selected-station-id>.json` on demand and uses
-its Digitransit bicycle geometry for outgoing flows. Missing files and missing
-individual routes fall back to straight lines.
+its Digitransit bicycle geometry for outgoing flows and the reversed geometry for
+incoming flows. Missing files and missing individual routes fall back to straight
+lines.
 
 To generate a bounded checkpoint, add the `DIGITRANSIT_SUBSCRIPTION_KEY` secret
 and run **Actions → Build bicycle routes → Run workflow**. The defaults start at
