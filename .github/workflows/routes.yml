@@ -19,7 +19,7 @@ on:
         default: "750"
         type: string
       max_consecutive_failures:
-        description: Stop after this many requests fail in a row
+        description: Stop after this many routes fail after all retries
         required: true
         default: "3"
         type: string
