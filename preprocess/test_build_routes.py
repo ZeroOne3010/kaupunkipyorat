@@ -100,6 +100,31 @@ class BuildRoutesTests(unittest.TestCase):
             payload = json.loads((root / "out/routes/2.json").read_text())
             self.assertEqual(payload["out"], {"1": {"p": "abc", "d": 10}, "3": {"p": "abc", "d": 30}})
 
+    def test_logs_batch_route_progress_and_estimates_only_selected_station_delays(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            root = Path(directory)
+            (root / "stations.js").write_text(
+                'const STATIONS = [[1,"One",60,24],[2,"Two",61,25],'
+                '[3,"Three",62,26],[4,"Four",63,27]];\n')
+            data = root / "data"; data.mkdir()
+            (data / "a.json").write_text(
+                '{"total":[[1,2,1],[1,3,1],[2,3,1],[3,1,1],[3,2,1],[3,4,1]]}')
+
+            result = routes.main(
+                ["--stations", str(root / "stations.js"), "--data", str(data),
+                 "--output", str(root / "out"), "--subscription-key", "key",
+                 "--start-station-index", "0", "--max-stations", "2", "--delay-ms", "60000"],
+                request_fn=lambda *_: {"p": "abc", "d": 10}, sleep_fn=lambda _: None)
+
+            self.assertEqual(result, 0)
+            logs = stdout.getvalue()
+            self.assertIn("Total directed routes required: 6", logs)
+            self.assertIn("Directed routes in selected batch: 3", logs)
+            self.assertIn("Estimated minimum delay time for selected batch: 1 min", logs)
+            self.assertIn("Route 1/3 (station route 1/2): 1 -> 2, attempt 1", logs)
+            self.assertIn("Route 3/3 (station route 1/1): 2 -> 3, attempt 1", logs)
+
     def test_retries_and_records_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -176,6 +201,31 @@ class BuildRoutesTests(unittest.TestCase):
             self.assertEqual(summary["routesSucceeded"], 2)
             self.assertEqual(summary["routesFailed"], 0)
             self.assertEqual(summary["serverErrorRetries"], 2)
+
+    def test_queued_route_log_retains_its_batch_progress_number(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            root = Path(directory)
+            (root / "stations.js").write_text(
+                'const STATIONS = [[1,"One",60,24],[2,"Two",61,25],[3,"Three",62,26]];\n')
+            data = root / "data"; data.mkdir()
+            (data / "a.json").write_text('{"total":[[1,2,1],[1,3,1]]}')
+            failed_once = False
+
+            def request(_endpoint, _key, _origin, destination):
+                nonlocal failed_once
+                if destination[0] == 3 and not failed_once:
+                    failed_once = True
+                    raise self.api_error(503)
+                return {"p": "abc", "d": 10}
+
+            result = routes.main(
+                ["--stations", str(root / "stations.js"), "--data", str(data),
+                 "--output", str(root / "out"), "--subscription-key", "key", "--delay-ms", "0"],
+                request_fn=request, sleep_fn=lambda _: None)
+
+            self.assertEqual(result, 0)
+            self.assertIn("Queued route 2/2: 1 -> 3, pass 1/2", stdout.getvalue())
 
     def test_configured_delay_is_applied_between_queued_requests(self):
         with tempfile.TemporaryDirectory() as directory:

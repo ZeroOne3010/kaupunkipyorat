@@ -217,10 +217,22 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
         parser.error("DIGITRANSIT_SUBSCRIPTION_KEY is required")
 
     total = sum(map(len, required.values()))
+    batch_route_total = sum(len(required[station[0]]) for station in selected)
+    batch_delay_count = sum(max(0, len(required[station[0]]) - 1) for station in selected)
+    batch_route_positions = {
+        (station[0], destination_id): position
+        for position, (station, destination_id) in enumerate(
+            ((station, destination_id) for station in selected
+             for destination_id in sorted(required[station[0]])),
+            start=1,
+        )
+    }
     print(f"Stations: {len(stations)}")
     print(f"Total directed routes required: {total}")
+    print(f"Directed routes in selected batch: {batch_route_total}")
     print(f"Configured delay: {args.delay_ms} ms")
-    print(f"Estimated minimum delay time: {format_duration(total * args.delay_ms)}")
+    print(f"Estimated minimum delay time for selected batch: "
+          f"{format_duration(batch_delay_count * args.delay_ms)}")
     by_id = {row[0]: row for row in stations}
     summary = {"startStationIndex": args.start_station_index, "stationsProcessed": 0,
                "routesAttempted": 0, "requestsMade": 0, "serverErrorRetries": 0,
@@ -232,6 +244,7 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
     stop_requested = False
     server_error_queue = []
     station_outputs = {}
+    batch_route_index = 0
     for index, origin in enumerate(selected, args.start_station_index):
         destinations = sorted(required[origin[0]])
         print(f"\nProcessing station index {index}\nStation: {origin[1]} (ID {origin[0]})")
@@ -241,11 +254,14 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
         station_outputs[origin[0]] = (output_path, station_output)
         write_json(output_path, station_output)
         for route_index, destination_id in enumerate(destinations):
+            batch_route_index += 1
             summary["routesAttempted"] += 1
             success = False
             queued = False
             for attempt in range(3):
-                print(f"Route {origin[0]} -> {destination_id}: attempt {attempt + 1}", flush=True)
+                print(f"Route {batch_route_index}/{batch_route_total} "
+                      f"(station route {route_index + 1}/{len(destinations)}): "
+                      f"{origin[0]} -> {destination_id}, attempt {attempt + 1}", flush=True)
                 try:
                     summary["requestsMade"] += 1
                     station_output["out"][str(destination_id)] = request_fn(args.endpoint, key, origin, by_id[destination_id])
@@ -316,7 +332,9 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
                 output_path, station_output = station_outputs[origin_id]
                 summary["requestsMade"] += 1
                 summary["serverErrorRetries"] += 1
-                print(f"Queued route {origin_id} -> {destination_id}: pass {queue_round}/2", flush=True)
+                route_position = batch_route_positions[(origin_id, destination_id)]
+                print(f"Queued route {route_position}/{batch_route_total}: "
+                      f"{origin_id} -> {destination_id}, pass {queue_round}/2", flush=True)
                 try:
                     station_output["out"][str(destination_id)] = request_fn(
                         args.endpoint, key, origin, by_id[destination_id])
