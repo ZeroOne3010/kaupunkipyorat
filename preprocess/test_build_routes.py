@@ -119,6 +119,7 @@ class BuildRoutesTests(unittest.TestCase):
 
             self.assertEqual(result, 0)
             logs = stdout.getvalue()
+            self.assertIn("Next successful run start station index: 2", logs)
             self.assertIn("Total directed routes required: 6", logs)
             self.assertIn("Directed routes in selected batch: 3", logs)
             self.assertIn("Estimated minimum delay time for selected batch: 1 min", logs)
