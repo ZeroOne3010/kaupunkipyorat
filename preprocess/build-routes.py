@@ -176,7 +176,7 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
     summary = {"startStationIndex": args.start_station_index, "stationsProcessed": 0,
                "routesAttempted": 0, "requestsMade": 0, "serverErrorRetries": 0,
                "routesSucceeded": 0, "routesFailed": 0,
-               "failedRoutes": [], "stoppedEarly": False}
+               "failedRoutes": [], "pendingRoutes": [], "stoppedEarly": False}
     retry_waits = (2, 5)
     consecutive_failures = 0
     consecutive_client_errors = 0
@@ -262,7 +262,7 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
             pending = server_error_queue
             server_error_queue = []
             print(f"Server-error queue pass {queue_round}/2: {len(pending)} route(s)", flush=True)
-            for origin_id, destination_id in pending:
+            for pending_index, (origin_id, destination_id) in enumerate(pending):
                 origin = by_id[origin_id]
                 output_path, station_output = station_outputs[origin_id]
                 summary["requestsMade"] += 1
@@ -273,6 +273,7 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
                         args.endpoint, key, origin, by_id[destination_id])
                     write_json(output_path, station_output)
                     summary["routesSucceeded"] += 1
+                    consecutive_failures = 0
                     consecutive_client_errors = 0
                     print(f"Queued route {origin_id} -> {destination_id} succeeded", flush=True)
                 except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError,
@@ -280,14 +281,19 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
                     status = error.status_code if isinstance(error, ApiExchangeError) else None
                     print(f"Queued route {origin_id} -> {destination_id} failed: {error}",
                           file=sys.stderr, flush=True)
-                    if status is not None and 500 <= status < 600:
+                    if status is not None and 500 <= status < 600 and queue_round < 2:
                         consecutive_client_errors = 0
                         server_error_queue.append((origin_id, destination_id))
                         print(f"HTTP {status}; retaining route for the next queue pass and "
                               "waiting an extra 1 s", file=sys.stderr, flush=True)
                         sleep_fn(1)
                     else:
-                        if status is not None and 400 <= status < 500:
+                        if status is not None and 500 <= status < 600:
+                            consecutive_client_errors = 0
+                            print(f"Route {origin_id} -> {destination_id} exhausted both queue passes",
+                                  file=sys.stderr, flush=True)
+                            sleep_fn(1)
+                        elif status is not None and 400 <= status < 500:
                             consecutive_client_errors += 1
                             print(f"Consecutive HTTP 4xx errors: {consecutive_client_errors}/3",
                                   file=sys.stderr, flush=True)
@@ -299,20 +305,28 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
                             consecutive_client_errors = 0
                         summary["routesFailed"] += 1
                         summary["failedRoutes"].append([origin_id, destination_id])
+                        consecutive_failures += 1
+                        if (not stop_requested
+                                and consecutive_failures >= args.max_consecutive_failures):
+                            summary["stoppedEarly"] = True
+                            summary["stopReason"] = (f"reached {args.max_consecutive_failures} "
+                                                     "consecutive routes that failed after retries")
+                            stop_requested = True
                 write_json(args.output / "routing-summary.json", summary)
                 if stop_requested:
+                    server_error_queue.extend(pending[pending_index + 1:])
                     print(f"Stopping immediately: {summary['stopReason']}", file=sys.stderr, flush=True)
                     break
             if stop_requested or not server_error_queue:
                 break
 
-        if not stop_requested:
-            for origin_id, destination_id in server_error_queue:
-                summary["routesFailed"] += 1
-                summary["failedRoutes"].append([origin_id, destination_id])
-                print(f"Route {origin_id} -> {destination_id} failed after both queue passes",
-                      file=sys.stderr, flush=True)
         write_json(args.output / "routing-summary.json", summary)
+    if server_error_queue:
+        summary["pendingRoutes"] = [[origin_id, destination_id]
+                                    for origin_id, destination_id in server_error_queue]
+        print(f"Leaving {len(server_error_queue)} queued route(s) pending due to early stop",
+              file=sys.stderr, flush=True)
+    write_json(args.output / "routing-summary.json", summary)
     print(f"\nStations processed: {summary['stationsProcessed']}")
     print(f"Routes attempted: {summary['routesAttempted']}")
     print(f"Routes succeeded: {summary['routesSucceeded']}")

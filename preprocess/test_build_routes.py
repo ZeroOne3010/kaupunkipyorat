@@ -192,6 +192,60 @@ class BuildRoutesTests(unittest.TestCase):
             self.assertEqual(calls, [(1, 2)] * 3)
             self.assertEqual(summary["stopReason"], "received 3 consecutive HTTP 4xx responses")
 
+    def test_exhausted_server_error_queue_enforces_failure_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "stations.js").write_text(
+                'const STATIONS = [[1,"One",60,24],[2,"Two",61,25],[3,"Three",62,26]];\n')
+            data = root / "data"; data.mkdir()
+            (data / "a.json").write_text('{"total":[[1,2,1],[1,3,1]]}')
+            calls = []
+
+            def request(_endpoint, _key, origin, destination):
+                calls.append((origin[0], destination[0]))
+                raise self.api_error(503)
+
+            result = routes.main(
+                ["--stations", str(root / "stations.js"), "--data", str(data),
+                 "--output", str(root / "out"), "--subscription-key", "key",
+                 "--delay-ms", "0", "--max-consecutive-failures", "1"],
+                request_fn=request, sleep_fn=lambda _: None)
+
+            summary = json.loads((root / "out/routing-summary.json").read_text())
+            self.assertEqual(result, 1)
+            self.assertEqual(calls, [(1, 2), (1, 3), (1, 2), (1, 3), (1, 2)])
+            self.assertEqual(summary["failedRoutes"], [[1, 2]])
+            self.assertEqual(summary["pendingRoutes"], [[1, 3]])
+            self.assertTrue(summary["stoppedEarly"])
+            self.assertEqual(summary["stopReason"],
+                             "reached 1 consecutive routes that failed after retries")
+
+    def test_queued_route_is_reported_pending_when_client_errors_stop_initial_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "stations.js").write_text(
+                'const STATIONS = [[1,"One",60,24],[2,"Two",61,25],[3,"Three",62,26]];\n')
+            data = root / "data"; data.mkdir()
+            (data / "a.json").write_text('{"total":[[1,2,1],[1,3,1]]}')
+
+            def request(_endpoint, _key, _origin, destination):
+                raise self.api_error(503 if destination[0] == 2 else 400)
+
+            result = routes.main(
+                ["--stations", str(root / "stations.js"), "--data", str(data),
+                 "--output", str(root / "out"), "--subscription-key", "key", "--delay-ms", "0"],
+                request_fn=request, sleep_fn=lambda _: None)
+
+            summary = json.loads((root / "out/routing-summary.json").read_text())
+            self.assertEqual(result, 1)
+            self.assertEqual(summary["routesAttempted"], 2)
+            self.assertEqual(summary["routesSucceeded"], 0)
+            self.assertEqual(summary["routesFailed"], 1)
+            self.assertEqual(summary["pendingRoutes"], [[1, 2]])
+            self.assertEqual(summary["routesAttempted"],
+                             summary["routesSucceeded"] + summary["routesFailed"]
+                             + len(summary["pendingRoutes"]))
+
 
 if __name__ == "__main__":
     unittest.main()
