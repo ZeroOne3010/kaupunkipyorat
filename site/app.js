@@ -171,14 +171,19 @@ function update() {
   });
   shown = shown.filter(([origin, destination]) => stationById.has(origin) && stationById.has(destination));
   const selectedRoutes = routedGeometryEnabled() && selectedId !== null ? routeCache.get(selectedId) : null;
-  map.getSource("flows").setData({type: "FeatureCollection", features: shown.map(([origin, destination, count]) => ({
-    type: "Feature", properties: {count, scale: FlowStyle.rideCountScale(count)}, geometry: {type: "LineString", coordinates:
-      RouteGeometry.connectionCoordinates(stationById.get(origin), stationById.get(destination), selectedId, selectedRoutes, decodedRouteCache)
-    }
-  }))});
+  const features = shown.map(([origin, destination, count]) => {
+    const coordinates = RouteGeometry.connectionCoordinates(
+      stationById.get(origin), stationById.get(destination), selectedId, selectedRoutes, decodedRouteCache
+    );
+    return coordinates && {
+      type: "Feature", properties: {count, scale: FlowStyle.rideCountScale(count)},
+      geometry: {type: "LineString", coordinates}
+    };
+  }).filter(Boolean);
+  map.getSource("flows").setData({type: "FeatureCollection", features});
   loadSelectedRoutes();
   map.getSource("stations").setData(stationGeoJSON(tuples));
-  const rideCount = shown.reduce((sum, tuple) => sum + tuple[2], 0);
+  const rideCount = features.reduce((sum, feature) => sum + feature.properties.count, 0);
   const rides = `${rideCount.toLocaleString()} rides`;
   document.querySelector("#all-rides").textContent = `${rides} shown`;
   document.querySelector("#collapsed-status").textContent = `${periodText(true)} · ${rides}`;
