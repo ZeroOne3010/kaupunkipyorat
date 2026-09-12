@@ -24,6 +24,21 @@ QUERY = """query BicycleRoute($from: PlanCoordinateInput!, $to: PlanCoordinateIn
 }"""
 
 
+class ApiExchangeError(ValueError):
+    """A failed route request with safe request and response diagnostics."""
+
+    def __init__(self, message, request_details, response):
+        super().__init__(message)
+        self.request_details = request_details
+        self.response = response
+
+    def format_exchange(self):
+        return ("API request (subscription key redacted):\n"
+                f"{json.dumps(self.request_details, ensure_ascii=False, indent=2)}\n"
+                "API response:\n"
+                f"{json.dumps(self.response, ensure_ascii=False, indent=2)}")
+
+
 def load_stations(path):
     """Read the array from the generated stations.js while preserving its order."""
     source = path.read_text(encoding="utf-8")
@@ -58,10 +73,13 @@ def parse_route(payload):
     if not edges:
         raise ValueError("no bicycle itinerary returned")
     legs = edges[0].get("node", {}).get("legs", [])
-    points = [leg.get("legGeometry", {}).get("points") for leg in legs]
-    if len(legs) != 1 or not points[0]:
-        raise ValueError("expected one direct bicycle leg with geometry")
-    return {"p": points[0], "d": round(float(legs[0]["distance"]))}
+    if len(legs) != 1:
+        raise ValueError(f"expected one direct bicycle leg with geometry; received {len(legs)} legs")
+    geometry = legs[0].get("legGeometry") or {}
+    points = geometry.get("points")
+    if not points:
+        raise ValueError("expected one direct bicycle leg with geometry; the leg had no geometry points")
+    return {"p": points, "d": round(float(legs[0]["distance"]))}
 
 
 def request_route(endpoint, subscription_key, origin, destination):
@@ -69,13 +87,38 @@ def request_route(endpoint, subscription_key, origin, destination):
         "from": {"latitude": origin[2], "longitude": origin[3]},
         "to": {"latitude": destination[2], "longitude": destination[3]},
     }
-    request = urllib.request.Request(endpoint, data=json.dumps({"query": QUERY, "variables": variables}).encode(), headers={
+    body = {"query": QUERY, "variables": variables}
+    headers = {
         "Content-Type": "application/json",
         "digitransit-subscription-key": subscription_key,
         "User-Agent": "kaupunkipyorat-route-builder/1.0",
-    })
-    with urllib.request.urlopen(request, timeout=60) as response:
-        return parse_route(json.load(response))
+    }
+    request = urllib.request.Request(endpoint, data=json.dumps(body).encode(), headers=headers)
+    request_details = {
+        "url": endpoint,
+        "method": "POST",
+        "headers": {**headers, "digitransit-subscription-key": "<redacted>"},
+        "body": body,
+    }
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            response_text = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as error:
+        response_text = error.read().decode("utf-8", errors="replace")
+        try:
+            response_payload = json.loads(response_text)
+        except json.JSONDecodeError:
+            response_payload = response_text
+        raise ApiExchangeError(str(error), request_details, response_payload) from error
+    try:
+        response_payload = json.loads(response_text)
+        return parse_route(response_payload)
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
+        try:
+            response_payload = json.loads(response_text)
+        except json.JSONDecodeError:
+            response_payload = response_text
+        raise ApiExchangeError(str(error), request_details, response_payload) from error
 
 
 def write_json(path, payload):
@@ -100,7 +143,7 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
     parser.add_argument("--max-stations", type=int, default=1)
     parser.add_argument("--delay-ms", type=int, default=750)
     parser.add_argument("--max-consecutive-failures", type=int, default=3,
-                        help="stop after this many consecutive failed requests")
+                        help="stop after this many routes fail after all retries")
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT)
     parser.add_argument("--subscription-key", default=None)
     args = parser.parse_args(argv)
@@ -156,20 +199,21 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
                     break
                 except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError, urllib.error.HTTPError) as error:
                     print(f"Route {origin[0]} -> {destination_id} failed: {error}", file=sys.stderr, flush=True)
-                    consecutive_failures += 1
-                    if consecutive_failures >= args.max_consecutive_failures:
-                        summary["stoppedEarly"] = True
-                        summary["stopReason"] = (f"reached {args.max_consecutive_failures} "
-                                                 "consecutive failed requests")
-                        stop_requested = True
-                        print(f"Stopping early: {summary['stopReason']}", file=sys.stderr, flush=True)
-                        break
+                    if attempt == 2 and isinstance(error, ApiExchangeError):
+                        print(error.format_exchange(), file=sys.stderr, flush=True)
                     if attempt < 2:
                         print(f"Waiting {retry_waits[attempt]} s before retry", flush=True)
                         sleep_fn(retry_waits[attempt])
             if not success:
                 summary["routesFailed"] += 1
                 summary["failedRoutes"].append([origin[0], destination_id])
+                consecutive_failures += 1
+                if consecutive_failures >= args.max_consecutive_failures:
+                    summary["stoppedEarly"] = True
+                    summary["stopReason"] = (f"reached {args.max_consecutive_failures} "
+                                             "consecutive routes that failed after retries")
+                    stop_requested = True
+                    print(f"Stopping early: {summary['stopReason']}", file=sys.stderr, flush=True)
             if stop_requested:
                 break
             if route_index + 1 < len(destinations):

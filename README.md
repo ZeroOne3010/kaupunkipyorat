@@ -93,6 +93,18 @@ all aggregate files in `site/data/`; it does not maintain a separate route list.
 Download the artifact and copy its `routes/` directory into `site/routes/` to use
 the generated files. Generated routes are never committed by the workflow.
 
+The builder expects Digitransit's direct bicycle result to contain exactly one leg
+with encoded geometry. An error such as `expected one direct bicycle leg with
+geometry` means the API returned an itinerary in a different shape (for example,
+zero or multiple legs, or a leg without geometry); it does not indicate corrupt
+trip data. The route is retried twice and, if it still fails, is listed in
+`routing-summary.json` and omitted so the site can use its straight-line fallback.
+After the third failed attempt, the workflow log includes the complete GraphQL
+request and API response for diagnosis; the Digitransit subscription key is always
+redacted.
+The build stops early only after the configured number of whole routes fail
+consecutively, rather than treating one route's three attempts as three failures.
+
 The same bounded build can be run locally:
 
 ```sh
