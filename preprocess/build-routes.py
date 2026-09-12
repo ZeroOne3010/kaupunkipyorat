@@ -317,6 +317,10 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
                     server_error_queue.extend(pending[pending_index + 1:])
                     print(f"Stopping immediately: {summary['stopReason']}", file=sys.stderr, flush=True)
                     break
+                if pending_index + 1 < len(pending):
+                    print(f"Waiting configured {args.delay_ms} ms before next queued route",
+                          flush=True)
+                    sleep_fn(args.delay_ms / 1000)
             if stop_requested or not server_error_queue:
                 break
 

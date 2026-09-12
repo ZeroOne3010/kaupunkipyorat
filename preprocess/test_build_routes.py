@@ -169,6 +169,32 @@ class BuildRoutesTests(unittest.TestCase):
             self.assertEqual(summary["routesFailed"], 0)
             self.assertEqual(summary["serverErrorRetries"], 2)
 
+    def test_configured_delay_is_applied_between_queued_requests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "stations.js").write_text(
+                'const STATIONS = [[1,"One",60,24],[2,"Two",61,25],'
+                '[3,"Three",62,26],[4,"Four",63,27]];\n')
+            data = root / "data"; data.mkdir()
+            (data / "a.json").write_text('{"total":[[1,2,1],[1,3,1],[1,4,1]]}')
+            failed_once = set()
+
+            def request(_endpoint, _key, _origin, destination):
+                if destination[0] in (2, 3) and destination[0] not in failed_once:
+                    failed_once.add(destination[0])
+                    raise self.api_error(503)
+                return {"p": "abc", "d": 10}
+
+            waits = []
+            result = routes.main(
+                ["--stations", str(root / "stations.js"), "--data", str(data),
+                 "--output", str(root / "out"), "--subscription-key", "key",
+                 "--delay-ms", "250"],
+                request_fn=request, sleep_fn=waits.append)
+
+            self.assertEqual(result, 0)
+            self.assertEqual(waits, [1, 0.25, 1, 0.25, 30, 0.25])
+
     def test_three_consecutive_client_errors_stop_immediately(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
