@@ -81,7 +81,7 @@
     const sorted = (items, property) => items.sort((a, b) => b[property] - a[property] || a.id - b.id);
     const qualified = entries.filter(stats => stats.trips >= minimumBusyness);
     return {
-      busiest: sorted(entries, "trips"),
+      busiest: sorted(entries.filter(stats => stats.trips > 0), "trips"),
       roundTrips: sorted([...qualified], "roundTripShare"),
       connected: sorted(entries.filter(stats => stats.connected > 0), "connected"),
       concentrated: sorted(qualified.filter(stats => stats.topCounterpartId !== undefined), "concentration"),

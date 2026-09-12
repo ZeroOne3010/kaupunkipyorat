@@ -76,9 +76,10 @@ test("shared station statistics derive all six rankings without double-counting 
 });
 
 test("ratio and average rankings enforce minimum activity", () => {
-  const rankings = stationRankings(aggregateStationStatistics([[1], [2]], [[1, 2, 19, 190, 1900]]), 20);
+  const rankings = stationRankings(aggregateStationStatistics([[1], [2], [3]], [[1, 2, 19, 190, 1900]]), 20);
 
   assert.equal(rankings.busiest.length, 2);
+  assert.deepEqual(rankings.busiest.map(stats => stats.id), [1, 2]);
   assert.equal(rankings.connected.length, 2);
   assert.equal(rankings.roundTrips.length, 0);
   assert.equal(rankings.concentrated.length, 0);

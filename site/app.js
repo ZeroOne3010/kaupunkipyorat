@@ -389,9 +389,11 @@ function renderStationRankings() {
   }));
 }
 
-function hideRankings() {
+function hideRankings(restoreFocus = true) {
+  const wasOpen = !document.querySelector("#rankings-panel").hidden;
   document.querySelector("#rankings-panel").hidden = true;
   document.querySelector("#rankings-backdrop").hidden = true;
+  if (restoreFocus && wasOpen) document.querySelector("#open-rankings").focus();
 }
 
 function showRankings() {
@@ -410,7 +412,7 @@ document.querySelector("#rankings-list").addEventListener("click", event => {
   const button = event.target.closest("button[data-station-id]");
   if (!button) return;
   selectedId = Number(button.dataset.stationId);
-  hideRankings();
+  hideRankings(false);
   closeInsightVisualization();
   const station = stationById.get(selectedId);
   if (station) map.easeTo({center: [station.lon, station.lat], zoom: Math.max(map.getZoom(), 14)});
