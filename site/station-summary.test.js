@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {stationSummary, busiestStationRank, formatDuration, formatPeriod, formatNetFlow} = require("./station-summary.js");
+const {aggregateStationStatistics, stationRankings, stationSummary, busiestStationRank, formatDuration, formatPeriod, formatNetFlow} = require("./station-summary.js");
 
 test("stationSummary derives weighted ride statistics and connection counts", () => {
   const summary = stationSummary(1, [
@@ -53,6 +53,38 @@ test("busiestStationRank ranks activity without counting round trips twice", () 
 
   assert.deepEqual(ranking, {rank: 1, total: 4});
   assert.deepEqual(busiestStationRank(3, [1, 2, 3, 4], [[1, 2, 4]]), {rank: 3, total: 4});
+});
+
+test("shared station statistics derive all six rankings without double-counting round trips", () => {
+  const statistics = aggregateStationStatistics([[1], [2], [3]], [
+    [1, 2, 15, 9000, 45000],
+    [2, 1, 10, 4000, 20000],
+    [1, 1, 5, 500, 500],
+    [2, 3, 10, 12000, 60000]
+  ]);
+  const rankings = stationRankings(statistics, 20);
+
+  assert.equal(statistics.get(1).trips, 30);
+  assert.equal(statistics.get(1).roundTrips, 5);
+  assert.equal(statistics.get(1).counterparts.get(2), 25);
+  assert.equal(rankings.busiest[0].id, 2);
+  assert.equal(rankings.roundTrips[0].id, 1);
+  assert.equal(rankings.connected[0].id, 2);
+  assert.equal(rankings.concentrated[0].id, 1);
+  assert.equal(rankings.distance[0].id, 2);
+  assert.equal(rankings.duration[0].id, 2);
+});
+
+test("ratio and average rankings enforce minimum activity", () => {
+  const rankings = stationRankings(aggregateStationStatistics([[1], [2], [3]], [[1, 2, 19, 190, 1900]]), 20);
+
+  assert.equal(rankings.busiest.length, 2);
+  assert.deepEqual(rankings.busiest.map(stats => stats.id), [1, 2]);
+  assert.equal(rankings.connected.length, 2);
+  assert.equal(rankings.roundTrips.length, 0);
+  assert.equal(rankings.concentrated.length, 0);
+  assert.equal(rankings.distance.length, 0);
+  assert.equal(rankings.duration.length, 0);
 });
 
 test("formatDuration produces compact minute and hour labels", () => {
