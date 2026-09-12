@@ -228,6 +228,8 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
         )
     }
     print(f"Stations: {len(stations)}")
+    print(f"Next successful run start station index: "
+          f"{args.start_station_index + len(selected)}")
     print(f"Total directed routes required: {total}")
     print(f"Directed routes in selected batch: {batch_route_total}")
     print(f"Configured delay: {args.delay_ms} ms")

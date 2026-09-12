@@ -90,6 +90,8 @@ and run **Actions → Build bicycle routes → Run workflow**. The defaults star
 station index 0 in `site/stations.js`, process one station, and wait 750 ms between
 sequential requests. The workflow discovers required directed routes by scanning
 all aggregate files in `site/data/`; it does not maintain a separate route list.
+At the start of the build, its log reports the start station index to use for the
+next run if the current batch succeeds.
 Download the artifact and copy its `routes/` directory into `site/routes/` to use
 the generated files. Generated routes are never committed by the workflow.
 
