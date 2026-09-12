@@ -33,10 +33,14 @@
 
   function connectionCoordinates(origin, destination, selectedId, routeFile, decodedCache) {
     const straight = [[origin.lon, origin.lat], [destination.lon, destination.lat]];
-    if (!routeFile || origin.id !== selectedId) return straight;
-    const route = routeFile.out?.[String(destination.id)];
+    if (!routeFile) return straight;
+    const outgoing = origin.id === selectedId;
+    const incoming = destination.id === selectedId;
+    if (!outgoing && !incoming) return straight;
+    const otherId = outgoing ? destination.id : origin.id;
+    const route = routeFile.out?.[String(otherId)];
     if (!route?.p) return straight;
-    const key = `${origin.id}:${destination.id}:${route.p}`;
+    const key = `${selectedId}:${otherId}:${route.p}`;
     if (!decodedCache.has(key)) {
       try {
         decodedCache.set(key, decodePolyline(route.p));
@@ -44,7 +48,8 @@
         return straight;
       }
     }
-    return decodedCache.get(key);
+    const coordinates = decodedCache.get(key);
+    return incoming ? [...coordinates].reverse() : coordinates;
   }
 
   return {decodePolyline, connectionCoordinates};

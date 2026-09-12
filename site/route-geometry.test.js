@@ -16,7 +16,26 @@ test("uses outgoing routes and caches decoded geometry", () => {
   const first = Routes.connectionCoordinates(origin, destination, 17, file, cache);
   assert.equal(cache.size, 1);
   assert.equal(Routes.connectionCoordinates(origin, destination, 17, file, cache), first);
-  assert.deepEqual(Routes.connectionCoordinates(destination, origin, 17, file, cache), [[25, 61], [24, 60]]);
+  assert.deepEqual(Routes.connectionCoordinates(destination, origin, 17, file, cache), [
+    [-126.453, 43.252], [-120.95, 40.7], [-120.2, 38.5]
+  ]);
+  assert.equal(cache.size, 1);
+});
+
+test("reverses the selected station's route for incoming connections", () => {
+  const selected = {id: 1, lat: 60, lon: 24};
+  const other = {id: 99, lat: 61, lon: 25};
+  const selectedRoutes = {out: {"99": {p: "_p~iF~ps|U_ulLnnqC_mqNvxq`@"}}};
+  assert.deepEqual(Routes.connectionCoordinates(other, selected, 1, selectedRoutes, new Map()), [
+    [-126.453, 43.252], [-120.95, 40.7], [-120.2, 38.5]
+  ]);
+});
+
+test("keeps unrelated connections straight when a station route file is loaded", () => {
+  const origin = {id: 17, lat: 60, lon: 24};
+  const destination = {id: 42, lat: 61, lon: 25};
+  const file = {out: {"42": {p: "_p~iF~ps|U_ulLnnqC_mqNvxq`@"}}};
+  assert.deepEqual(Routes.connectionCoordinates(origin, destination, 99, file, new Map()), [[24, 60], [25, 61]]);
 });
 
 test("falls back for a missing or malformed route", () => {
