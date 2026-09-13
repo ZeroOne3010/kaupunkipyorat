@@ -137,7 +137,7 @@ aggregates are static files.
 ## Licenses
 
 * Trip data: CC-BY 4.0 City Bike Finland 2016-2026
-* Bike station data: CC-BY 4.0 HSL 2026
+* Bike station and route data: CC-BY 4.0 HSL 2026
 * The code: MIT
 * Map: OpenStreetMap contributors 
 
