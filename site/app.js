@@ -12,6 +12,7 @@ const routeCache = new Map();
 const routeRequests = new Map();
 const unavailableRoutes = new Set();
 const decodedRouteCache = new Map();
+const stationProfileCache = new Map();
 const MAX_FLOW_PARTICLES = 150;
 const PARTICLE_SPEED_METERS_PER_SECOND = 95;
 let flowParticles = [];
@@ -402,6 +403,57 @@ document.querySelector("#threshold").addEventListener("change", event => {
   update();
 });
 document.querySelector("#clear").addEventListener("click", () => { selectedId = null; update(); });
+
+function hideStationProfile(restoreFocus = true) {
+  const wasOpen = !document.querySelector("#station-profile").hidden;
+  document.querySelector("#station-profile").hidden = true;
+  document.querySelector("#station-profile-backdrop").hidden = true;
+  if (restoreFocus && wasOpen && selectedId !== null) document.querySelector("#open-station-profile").focus();
+}
+
+function stationProfileNavigate(mode, value) {
+  hideStationProfile(false);
+  if (mode === "day") selectedDate.setUTCDate(value);
+  else selectedDate.setUTCHours(value);
+  document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
+  update();
+}
+
+function showStationProfile() {
+  if (selectedId === null || !data || !selectedDate) return;
+  hideRankings(false);
+  hideInsights();
+  const key = `${monthKey(selectedDate)}:${selectedId}`;
+  if (!stationProfileCache.has(key)) stationProfileCache.set(key, StationProfile.monthlyHistory(selectedId, data));
+  const station = stationById.get(selectedId);
+  const monthlyStatistics = StationSummary.aggregateStationStatistics(STATIONS, data.total);
+  const stats = StationSummary.summaryFromStatistics(monthlyStatistics.get(selectedId));
+  const rank = 1 + [...monthlyStatistics.values()].filter(item => item.trips > stats.trips).length;
+  const directionalTotal = stats.arrivals + stats.departures;
+  const arrivalsShare = directionalTotal ? stats.arrivals / directionalTotal * 100 : 0;
+  const departuresShare = directionalTotal ? stats.departures / directionalTotal * 100 : 0;
+  document.querySelector("#profile-station-name").textContent = station.name;
+  document.querySelector("#profile-month").textContent = selectedDate.toLocaleDateString(undefined, {month: "long", year: "numeric", timeZone: "UTC"});
+  document.querySelector("#profile-summary").replaceChildren(...[
+    `${stats.trips.toLocaleString()} trips · #${rank.toLocaleString()} busiest`,
+    `${arrivalsShare.toLocaleString(undefined, {maximumFractionDigits: 1})}% arrivals · ${departuresShare.toLocaleString(undefined, {maximumFractionDigits: 1})}% departures`,
+    `${stats.roundTripPercentage.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}% round trips`
+  ].map(text => { const row = document.createElement("p"); row.textContent = text; return row; }));
+  StationProfile.render({
+    daily: document.querySelector("#profile-daily-chart"),
+    hourly: document.querySelector("#profile-hourly-chart"),
+    net: document.querySelector("#profile-net-chart")
+  }, stationProfileCache.get(key), selectedDate, {
+    day: day => stationProfileNavigate("day", day), hour: hour => stationProfileNavigate("hour", hour)
+  });
+  document.querySelector("#station-profile").hidden = false;
+  document.querySelector("#station-profile-backdrop").hidden = false;
+  document.querySelector("#close-station-profile").focus();
+}
+
+document.querySelector("#open-station-profile").addEventListener("click", showStationProfile);
+document.querySelector("#close-station-profile").addEventListener("click", () => hideStationProfile());
+document.querySelector("#station-profile-backdrop").addEventListener("click", () => hideStationProfile());
 document.querySelectorAll("#top-outgoing, #top-incoming").forEach(list => list.addEventListener("click", event => {
   const button = event.target.closest("button[data-station-id]");
   if (!button) return;
@@ -615,6 +667,7 @@ document.querySelector("#insights-list").addEventListener("click", event => {
   if (ride) visualizeInsight(ride);
 });
 document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !document.querySelector("#station-profile").hidden) hideStationProfile();
   if (event.key === "Escape" && !document.querySelector("#insights-panel").hidden) hideInsights();
   if (event.key === "Escape" && !document.querySelector("#rankings-panel").hidden) hideRankings();
 });
