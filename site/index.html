@@ -14,6 +14,7 @@
     <div class="summary-heading">
       <div><span class="eyebrow">Station summary</span><h2 id="station">Station</h2></div>
       <div class="summary-actions">
+        <button id="open-station-profile" class="icon-button profile-button" type="button" aria-haspopup="dialog" aria-label="Open station profile" title="Station profile">▥</button>
         <button id="toggle-summary" class="icon-button" type="button" aria-expanded="true" aria-controls="summary-body" aria-label="Collapse station summary">⌃</button>
         <button id="clear" class="icon-button" type="button" aria-label="Close station summary">×</button>
       </div>
@@ -32,6 +33,28 @@
       </div>
     </div>
   </aside>
+
+  <div id="station-profile-backdrop" class="profile-backdrop" hidden></div>
+  <section id="station-profile" class="station-profile" role="dialog" aria-modal="true" aria-labelledby="profile-station-name" hidden>
+    <header class="profile-heading">
+      <div><span class="eyebrow">Station profile</span><h2 id="profile-station-name">Station</h2></div>
+      <button id="close-station-profile" class="icon-button" type="button" aria-label="Close station profile">×</button>
+    </header>
+    <p id="profile-month" class="profile-month">—</p>
+    <div id="profile-summary" class="profile-summary"></div>
+    <section class="profile-chart-section">
+      <h3>Activity by day</h3><p>Trips involving this station</p>
+      <div id="profile-daily-chart" class="profile-chart"></div>
+    </section>
+    <section class="profile-chart-section">
+      <h3>Typical day</h3><p>Average per day · <span class="chart-key arrivals"></span>Arrivals <span class="chart-key departures"></span>Departures</p>
+      <div id="profile-hourly-chart" class="profile-chart"></div>
+    </section>
+    <section class="profile-chart-section">
+      <h3>Net flow by day</h3><p>Arrivals minus departures</p>
+      <div id="profile-net-chart" class="profile-chart"></div>
+    </section>
+  </section>
 
   <section class="panel" aria-label="Map controls">
     <header class="panel-heading">
@@ -154,6 +177,7 @@
   <script src="station-style.js"></script>
   <script src="station-balance.js"></script>
   <script src="station-summary.js"></script>
+  <script src="station-profile.js"></script>
   <script src="monthly-insights.js"></script>
   <script src="route-geometry.js"></script>
   <script src="flow-particles.js"></script>
