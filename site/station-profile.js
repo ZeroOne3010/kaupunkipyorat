@@ -23,6 +23,10 @@
         if (destination === stationId) bucket.arrivals += count;
       });
     });
+    hourlyTypical.forEach(bucket => {
+      bucket.arrivals /= dayCount;
+      bucket.departures /= dayCount;
+    });
     return {daily, hourlyTypical};
   }
 
@@ -98,9 +102,10 @@
     const dayTicks = history.daily.map((item, index) => [index, item.day]).filter(([index]) => index === 0 || (index + 1) % 5 === 0 || index === history.daily.length - 1);
     renderChart(container.daily, {label: "Trips by calendar day", series: [{className: "activity", values: history.daily.map(day => day.busyness)}],
       points: history.daily.map(day => ({tooltip: `${dayLabel(day.day)} · ${day.busyness.toLocaleString()} trips`})), ticks: dayTicks, onSelect: index => callbacks.day(history.daily[index].day)});
-    renderChart(container.hourly, {label: "Typical day arrivals and departures by hour", series: [
+    const average = value => value.toLocaleString(undefined, {maximumFractionDigits: 1});
+    renderChart(container.hourly, {label: "Typical day average arrivals and departures by hour", series: [
       {className: "arrivals", values: history.hourlyTypical.map(hour => hour.arrivals)}, {className: "departures", values: history.hourlyTypical.map(hour => hour.departures)}],
-      points: history.hourlyTypical.map(item => ({tooltip: `${String(item.hour).padStart(2, "0")}:00–${String((item.hour + 1) % 24).padStart(2, "0")}:00 · ${item.arrivals.toLocaleString()} arrivals · ${item.departures.toLocaleString()} departures`})),
+      points: history.hourlyTypical.map(item => ({tooltip: `${String(item.hour).padStart(2, "0")}:00–${String((item.hour + 1) % 24).padStart(2, "0")}:00 · ${average(item.arrivals)} average arrivals · ${average(item.departures)} average departures`})),
       ticks: [0, 4, 8, 12, 16, 20, 23].map(hour => [hour, String(hour).padStart(2, "0")]), onSelect: callbacks.hour});
     renderChart(container.net, {label: "Daily net flow", centered: true, series: [{className: "net", values: history.daily.map(day => day.netFlow)}],
       points: history.daily.map(day => ({tooltip: `${dayLabel(day.day)} · Net flow ${day.netFlow > 0 ? "+" : ""}${day.netFlow.toLocaleString()}`})), ticks: dayTicks, onSelect: index => callbacks.day(history.daily[index].day)});

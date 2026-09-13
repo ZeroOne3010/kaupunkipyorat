@@ -17,8 +17,18 @@ test("monthly history includes every day and all hours with shared station seman
   assert.equal(history.daily[1].busyness, 0);
   assert.equal(history.daily[2].busyness, 4);
   assert.equal(history.hourlyTypical.length, 24);
-  assert.deepEqual(history.hourlyTypical[8], {hour: 8, arrivals: 18, departures: 12});
+  assert.deepEqual(history.hourlyTypical[8], {hour: 8, arrivals: 18 / 31, departures: 12 / 31});
   assert.deepEqual(history.hourlyTypical[0], {hour: 0, arrivals: 0, departures: 0});
+});
+
+test("typical-day buckets average activity over every represented calendar day", () => {
+  const h = Array.from({length: 2 * 24}, () => []);
+  h[8] = [[2, 1, 10], [1, 3, 4]];
+  h[24 + 8] = [[2, 1, 20], [1, 3, 8]];
+
+  const history = monthlyHistory(1, {y: 2025, m: 2, d: [], h});
+
+  assert.deepEqual(history.hourlyTypical[8], {hour: 8, arrivals: 30 / 28, departures: 12 / 28});
 });
 
 test("monthly history uses the calendar length from the data month", () => {

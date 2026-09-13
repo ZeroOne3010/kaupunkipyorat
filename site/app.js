@@ -413,6 +413,7 @@ function hideStationProfile(restoreFocus = true) {
 
 function stationProfileNavigate(mode, value) {
   hideStationProfile(false);
+  closeInsightVisualization();
   if (mode === "day") selectedDate.setUTCDate(value);
   else selectedDate.setUTCHours(value);
   document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
