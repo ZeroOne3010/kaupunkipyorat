@@ -91,7 +91,9 @@ station index 0 in `site/stations.js`, process one station, and wait 750 ms betw
 sequential requests. The workflow discovers required directed routes by scanning
 all aggregate files in `site/data/`; it does not maintain a separate route list.
 At the start of the build, its log reports the start station index to use for the
-next run if the current batch succeeds.
+next run if the current batch succeeds. After every tenth route, the log also
+reports an `HH:MM:SS` ETA calculated from the batch's average route throughput so
+far.
 Download the artifact and copy its `routes/` directory into `site/routes/` to use
 the generated files. Generated routes are never committed by the workflow.
 

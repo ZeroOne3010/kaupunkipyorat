@@ -184,7 +184,15 @@ def format_duration(milliseconds):
     return f"{hours} h {minutes} min" if hours else f"{minutes} min"
 
 
-def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
+def estimated_completion_time(started_at, current_time, routes_completed, route_total):
+    """Estimate the wall-clock completion time from average route throughput."""
+    elapsed = current_time - started_at
+    remaining = route_total - routes_completed
+    completion_time = current_time + (elapsed / routes_completed * remaining)
+    return time.strftime("%H:%M:%S", time.localtime(completion_time))
+
+
+def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep, time_fn=time.time):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stations", type=Path, default=Path("site/stations.js"))
     parser.add_argument("--data", type=Path, default=Path("site/data"))
@@ -247,6 +255,7 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
     server_error_queue = []
     station_outputs = {}
     batch_route_index = 0
+    job_started_at = time_fn()
     for index, origin in enumerate(selected, args.start_station_index):
         destinations = sorted(required[origin[0]])
         print(f"\nProcessing station index {index}\nStation: {origin[1]} (ID {origin[0]})")
@@ -311,6 +320,11 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep):
                                              "consecutive routes that failed after retries")
                     stop_requested = True
                     print(f"Stopping early: {summary['stopReason']}", file=sys.stderr, flush=True)
+            if batch_route_index % 10 == 0 and not stop_requested:
+                current_time = time_fn()
+                eta = estimated_completion_time(
+                    job_started_at, current_time, batch_route_index, batch_route_total)
+                print(f"ETA: {eta}", flush=True)
             if stop_requested:
                 break
             if route_index + 1 < len(destinations):
