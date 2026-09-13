@@ -12,6 +12,13 @@ const routeCache = new Map();
 const routeRequests = new Map();
 const unavailableRoutes = new Set();
 const decodedRouteCache = new Map();
+const MAX_FLOW_PARTICLES = 150;
+const PARTICLE_SPEED_METERS_PER_SECOND = 95;
+let flowParticles = [];
+let particleFrame = null;
+let particleLastTime = null;
+let particleInteractionPaused = false;
+const particleFeatureCollection = {type: "FeatureCollection", features: []};
 let statisticsTupleReference = null;
 let periodStatistics = null;
 let periodRankings = null;
@@ -144,6 +151,48 @@ function routedGeometryEnabled() {
   return document.querySelector('input[name="geometry"]:checked').value === "routes";
 }
 
+function particlesEnabled() {
+  return document.querySelector('input[name="particles"]:checked').value === "on";
+}
+
+function clearParticles() {
+  if (particleFrame !== null) cancelAnimationFrame(particleFrame);
+  particleFrame = null;
+  particleLastTime = null;
+  flowParticles = [];
+  map.getSource("flow-particles")?.setData({type: "FeatureCollection", features: []});
+}
+
+function particleFrameData(timestamp) {
+  particleFrame = null;
+  if (!particlesEnabled() || document.hidden) return;
+  if (!particleInteractionPaused) {
+    const elapsed = particleLastTime === null ? 0 : Math.min(0.1, (timestamp - particleLastTime) / 1000);
+    flowParticles.forEach(particle => {
+      particle.distance = (particle.distance + elapsed * PARTICLE_SPEED_METERS_PER_SECOND) % particle.path.totalLength;
+      FlowParticles.positionAt(particle.path, particle.distance, particle.feature.geometry.coordinates);
+    });
+    map.getSource("flow-particles")?.setData(particleFeatureCollection);
+  }
+  particleLastTime = timestamp;
+  particleFrame = requestAnimationFrame(particleFrameData);
+}
+
+function rebuildParticles(flowFeatures) {
+  clearParticles();
+  if (!particlesEnabled() || document.hidden) return;
+  flowParticles = FlowParticles.createParticles(flowFeatures.map(feature => ({
+    count: feature.properties.count,
+    coordinates: feature.geometry.coordinates
+  })), MAX_FLOW_PARTICLES);
+  particleFeatureCollection.features = flowParticles.map(particle => {
+    const coordinates = FlowParticles.positionAt(particle.path, particle.distance, [0, 0]);
+    particle.feature = {type: "Feature", properties: {}, geometry: {type: "Point", coordinates}};
+    return particle.feature;
+  });
+  particleFrame = requestAnimationFrame(particleFrameData);
+}
+
 async function loadSelectedRoutes() {
   const stationId = selectedId;
   if (!routedGeometryEnabled() || stationId === null || routeCache.has(stationId) || unavailableRoutes.has(stationId)) return;
@@ -195,6 +244,7 @@ function update() {
     };
   }).filter(Boolean);
   map.getSource("flows").setData({type: "FeatureCollection", features});
+  rebuildParticles(features);
   loadSelectedRoutes();
   map.getSource("stations").setData(stationGeoJSON(tuples, statistics));
   const rideCount = features.reduce((sum, feature) => sum + feature.properties.count, 0);
@@ -259,6 +309,11 @@ map.on("load", async () => {
   map.addSource("flows", {type: "geojson", data: {type: "FeatureCollection", features: []}});
   map.addLayer({id: "flows", type: "line", source: "flows", paint: {
     "line-color": "#006bb6", "line-opacity": ["+", 0.2, ["*", 0.65, ["get", "scale"]]], "line-width": ["+", 1, ["*", 7, ["get", "scale"]]]
+  }});
+  map.addSource("flow-particles", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+  map.addLayer({id: "flow-particles", type: "circle", source: "flow-particles", paint: {
+    "circle-radius": 3, "circle-color": "#fff4b8", "circle-opacity": 0.82,
+    "circle-stroke-color": "#17324d", "circle-stroke-width": 0.7
   }});
   map.addSource("insight-flow", {type: "geojson", data: {type: "FeatureCollection", features: []}});
   map.addLayer({id: "insight-flow", type: "line", source: "insight-flow", paint: {
@@ -330,6 +385,15 @@ document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventL
 document.querySelectorAll('input[name="direction"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="coloring"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="geometry"]').forEach(input => input.addEventListener("change", update));
+document.querySelectorAll('input[name="particles"]').forEach(input => input.addEventListener("change", () => {
+  if (particlesEnabled()) update(); else clearParticles();
+}));
+map.on("movestart", () => { particleInteractionPaused = true; particleLastTime = null; });
+map.on("moveend", () => { particleInteractionPaused = false; particleLastTime = null; });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearParticles();
+  else if (particlesEnabled() && data) update();
+});
 document.querySelectorAll(".time-navigation button").forEach(button => button.addEventListener("click", () => {
   navigateTime(button.dataset.unit, Number(button.dataset.step));
 }));
