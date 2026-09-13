@@ -24,13 +24,17 @@ let statisticsTupleReference = null;
 let periodStatistics = null;
 let periodRankings = null;
 const {availableMonthTarget, monthKey, shiftedDate} = TimeNavigation;
+const MAP_STYLES = {
+  light: "https://tiles.openfreemap.org/styles/bright",
+  dark: "https://tiles.openfreemap.org/styles/dark"
+};
 
 const map = new maplibregl.Map({
   container: "map",
   center: [24.944, 60.162],
   zoom: 13.3,
   attributionControl: false,
-  style: "https://tiles.openfreemap.org/styles/bright"
+  style: MAP_STYLES[document.documentElement.dataset.theme] || MAP_STYLES.light
 });
 map.addControl(new maplibregl.NavigationControl(), "top-right");
 map.addControl(new maplibregl.AttributionControl({compact: true}), "top-right");
@@ -306,7 +310,8 @@ async function navigateTime(unit, amount) {
   }
 }
 
-map.on("load", async () => {
+function addDataLayers() {
+  if (map.getSource("flows")) return;
   map.addSource("flows", {type: "geojson", data: {type: "FeatureCollection", features: []}});
   map.addLayer({id: "flows", type: "line", source: "flows", paint: {
     "line-color": "#006bb6", "line-opacity": ["+", 0.2, ["*", 0.65, ["get", "scale"]]], "line-width": ["+", 1, ["*", 7, ["get", "scale"]]]
@@ -358,6 +363,10 @@ map.on("load", async () => {
   map.addLayer({id: "insight-stations", type: "circle", source: "stations", minzoom: 0, filter: ["==", ["get", "insight"], true], paint: {
     "circle-radius": 10, "circle-color": "#fff", "circle-stroke-color": "#ed6a00", "circle-stroke-width": 5
   }});
+}
+
+map.on("load", async () => {
+  addDataLayers();
   map.on("click", "stations", event => { closeInsightVisualization(); selectedId = Number(event.features[0].properties.id); update(); });
   map.on("mouseenter", "stations", () => { map.getCanvas().style.cursor = "pointer"; });
   map.on("mouseleave", "stations", () => { map.getCanvas().style.cursor = ""; });
@@ -380,6 +389,15 @@ map.on("load", async () => {
     document.querySelector("#period-label").textContent = `Could not load data: ${error.message}`;
     document.querySelector("#collapsed-status").textContent = "Data unavailable";
   }
+});
+
+document.addEventListener("themechange", event => {
+  clearParticles();
+  map.once("style.load", () => {
+    addDataLayers();
+    if (data) update();
+  });
+  map.setStyle(MAP_STYLES[event.detail.theme]);
 });
 
 document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener("change", update));

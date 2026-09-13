@@ -12,17 +12,30 @@
     }
   }
 
+  function availableStorage(target) {
+    try {
+      return target.localStorage;
+    } catch (_) {
+      return null;
+    }
+  }
+
   function init(document, media, storage) {
     let preference = storedTheme(storage);
 
     function apply() {
       const dark = preference ? preference === "dark" : media.matches;
-      document.documentElement.dataset.theme = dark ? "dark" : "light";
-      document.documentElement.style.colorScheme = dark ? "dark" : "light";
+      const theme = dark ? "dark" : "light";
+      const previousTheme = document.documentElement.dataset.theme;
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme;
       const toggle = document.querySelector("#theme-toggle");
       if (toggle) {
         toggle.checked = dark;
         toggle.closest("label").title = dark ? "Use light theme" : "Use dark theme";
+      }
+      if (previousTheme && previousTheme !== theme && root.CustomEvent) {
+        document.dispatchEvent(new root.CustomEvent("themechange", {detail: {theme}}));
       }
       return dark;
     }
@@ -46,7 +59,9 @@
     return {apply, connectToggle};
   }
 
-  const api = {STORAGE_KEY, storedTheme, init};
+  const api = {STORAGE_KEY, storedTheme, availableStorage, init};
   root.Theme = api;
-  if (root.document && root.matchMedia) init(root.document, root.matchMedia("(prefers-color-scheme: dark)"), root.localStorage);
+  if (root.document && root.matchMedia) {
+    init(root.document, root.matchMedia("(prefers-color-scheme: dark)"), availableStorage(root));
+  }
 })(typeof globalThis === "undefined" ? this : globalThis);

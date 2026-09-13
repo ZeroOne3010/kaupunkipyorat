@@ -118,7 +118,6 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 }
 
 [data-theme="dark"] body { color: #e5edf4; background: #0b1620; }
-[data-theme="dark"] #map .maplibregl-canvas { filter: brightness(.64) saturate(.72) contrast(1.18); }
 [data-theme="dark"] .panel,
 [data-theme="dark"] .summary,
 [data-theme="dark"] .insights-panel,
@@ -176,6 +175,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 [data-theme="dark"] .insight-expand { color: #7dc7f4; }
 [data-theme="dark"] .swatch { border-color: #d6e0e8; }
 [data-theme="dark"] .theme-icon { color: #dce8f0; }
+[data-theme="dark"] .data-notice { color: #ffb77f; }
 .title-row { display: flex; align-items: center; gap: 9px; }
 .high-level-actions { display: flex; gap: 5px; }
 .insights-button { padding: 4px 8px; border: 1px solid #aab9c5; border-radius: 999px; background: #edf3f7; color: #17324d; font: 700 11px/1.2 system-ui, sans-serif; cursor: pointer; }
