@@ -45,6 +45,13 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .color-control { width: 190px; }
 .color-control label, .geometry-control label { padding-block: 5px; }
 .geometry-control { width: 160px; }
+.info-popup { position: relative; margin-left: -3px; }
+.info-popup summary { display: grid; width: 22px; height: 22px; box-sizing: border-box; place-items: center; border: 1px solid #8295a5; border-radius: 50%; background: #fff; color: #526a7e; font: 800 13px/1 Georgia, serif; cursor: pointer; list-style: none; }
+.info-popup summary::-webkit-details-marker { display: none; }
+.info-popup summary:hover, .info-popup summary:focus-visible { border-color: #1683cf; color: #006bb6; outline: 2px solid transparent; }
+.info-popup[open] summary { border-color: #1683cf; background: #edf7fd; color: #006bb6; }
+.info-popup-content { position: absolute; z-index: 3; right: 0; bottom: calc(100% + 8px); width: 250px; box-sizing: border-box; padding: 10px 11px; border: 1px solid #c8d4dd; border-radius: 8px; background: #fff; box-shadow: 0 4px 18px #17324d33; color: #17324d; font-size: 12px; font-weight: 400; }
+.info-popup-content p { margin: 3px 0 0; }
 .particles-control { width: 112px; }
 .particles-control label { padding-block: 5px; }
 .threshold { display: flex; align-items: center; gap: 3px; font-size: 16px; font-weight: 750; }
@@ -66,6 +73,9 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .swatch.positive { background: #2f9e72; }
 .swatch.positive-strong { background: #087f5b; }
 .hint { color: #526a7e; margin: -1px 0 0; font-size: 12px; }
+.app-footer { display: flex; flex-wrap: wrap; gap: 1px 5px; margin-top: 7px; padding-top: 7px; border-top: 1px solid #e1e8ed; color: #6b7e8e; font-size: 9px; line-height: 1.35; }
+.app-footer a { color: #526a7e; font-weight: 700; }
+.app-footer a:hover, .app-footer a:focus-visible { color: #006bb6; }
 .summary { top: 12px; left: 12px; width: min(390px, calc(100vw - 50px)); padding: 14px; }
 .summary.collapsed #summary-body { display: none; }
 .summary.collapsed #toggle-summary { transform: rotate(180deg); }
@@ -95,6 +105,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
   .summary { top: 8px; left: 8px; width: calc(100vw - 44px); max-height: calc(100vh - 190px); overflow: auto; }
   .summary-columns { gap: 10px; }
   .balance-legend { font-size: 9px; }
+  .info-popup-content { right: -4px; width: min(250px, calc(100vw - 48px)); }
 }
 .title-row { display: flex; align-items: center; gap: 9px; }
 .high-level-actions { display: flex; gap: 5px; }
