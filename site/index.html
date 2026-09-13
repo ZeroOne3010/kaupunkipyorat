@@ -6,6 +6,7 @@
   <title>Helsinki city-bike flows</title>
   <link href="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.css" rel="stylesheet">
   <link href="style.css" rel="stylesheet">
+  <script src="theme.js"></script>
 </head>
 <body>
   <div id="map" aria-label="Map of Helsinki city-bike trips"></div>
@@ -64,6 +65,11 @@
         <button type="button" data-step="-1" data-unit="month" aria-label="Previous selected period">−1M</button>
         <button type="button" data-step="1" data-unit="month" aria-label="Next selected period">+1M</button>
       </div>
+      <label class="theme-switch" title="Use dark theme">
+        <span class="theme-icon" aria-hidden="true">☾</span>
+        <input id="theme-toggle" type="checkbox" role="switch" aria-label="Dark mode">
+        <span class="switch-track" aria-hidden="true"><span></span></span>
+      </label>
       <button id="toggle-controls" class="icon-button" type="button" aria-expanded="true" aria-controls="controls-body" aria-label="Collapse map controls">⌄</button>
     </header>
     <div id="controls-body">

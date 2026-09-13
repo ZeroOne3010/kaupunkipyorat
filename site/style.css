@@ -1,4 +1,4 @@
-:root { color-scheme: light; }
+:root { color-scheme: light dark; }
 [hidden] { display: none !important; }
 html, body, #map { height: 100%; margin: 0; }
 body { font: 14px/1.4 system-ui, sans-serif; color: #17324d; }
@@ -14,6 +14,14 @@ h2 { font-size: 17px; }
 .summary h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eyebrow { display: block; color: #526a7e; font-size: 10px; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
 .icon-button { flex: 0 0 auto; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: #edf3f7; color: #17324d; font-size: 22px; line-height: 1; cursor: pointer; }
+.theme-switch { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; cursor: pointer; }
+.theme-icon { color: #526a7e; font-size: 18px; line-height: 1; }
+.theme-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.switch-track { position: relative; width: 34px; height: 20px; border: 1px solid #8295a5; border-radius: 999px; background: #d9e1e7; transition: background .18s ease; }
+.switch-track span { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #17324d66; transition: transform .18s ease; }
+.theme-switch input:checked + .switch-track { border-color: #1683cf; background: #1683cf; }
+.theme-switch input:checked + .switch-track span { transform: translateX(14px); }
+.theme-switch input:focus-visible + .switch-track { outline: 2px solid #1683cf; outline-offset: 2px; }
 #collapsed-status { display: none; min-width: 0; margin: 0; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .collapsed-navigation { flex: 0 0 auto; }
 .panel:not(.collapsed) .collapsed-navigation { display: none; }
@@ -108,6 +116,66 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
   .balance-legend { font-size: 9px; }
   .info-popup-content { right: -4px; width: min(250px, calc(100vw - 48px)); }
 }
+
+[data-theme="dark"] body { color: #e5edf4; background: #0b1620; }
+[data-theme="dark"] .panel,
+[data-theme="dark"] .summary,
+[data-theme="dark"] .insights-panel,
+[data-theme="dark"] .rankings-panel { border-color: #405364; background: rgba(20,35,48,.97); box-shadow: 0 5px 24px #0009; }
+[data-theme="dark"] .station-profile { border-color: #405364; background: #142330; box-shadow: 0 8px 36px #000b; }
+[data-theme="dark"] .eyebrow,
+[data-theme="dark"] .color-row,
+[data-theme="dark"] .geometry-row,
+[data-theme="dark"] .particles-row,
+[data-theme="dark"] .hint,
+[data-theme="dark"] .summary-period,
+[data-theme="dark"] .station-rank,
+[data-theme="dark"] .summary .balance-summary,
+[data-theme="dark"] .ride-details dt,
+[data-theme="dark"] .summary .unique-count,
+[data-theme="dark"] .summary .empty,
+[data-theme="dark"] .balance-legend,
+[data-theme="dark"] .busyness-legend,
+[data-theme="dark"] .rankings-period,
+[data-theme="dark"] .ranking-row button::before,
+[data-theme="dark"] .ranking-value,
+[data-theme="dark"] .insight-label,
+[data-theme="dark"] .insight-details,
+[data-theme="dark"] .insights-unavailable,
+[data-theme="dark"] .profile-month,
+[data-theme="dark"] .profile-chart-section > p,
+[data-theme="dark"] .chart-axis-label,
+[data-theme="dark"] .chart-value-label { color: #aebdca; fill: #aebdca; }
+[data-theme="dark"] .icon-button,
+[data-theme="dark"] .time-navigation button,
+[data-theme="dark"] .insights-button { border-color: #52687a; background: #263b4c; color: #f2f6f9; }
+[data-theme="dark"] .segments label,
+[data-theme="dark"] select,
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] .info-popup summary,
+[data-theme="dark"] .info-popup-content,
+[data-theme="dark"] .insight-row { border-color: #52687a; background: #1b2d3c; color: #e5edf4; }
+[data-theme="dark"] .segments label:has(input:checked) { border-color: #75b9e7; background: #d9eaf5; color: #102638; }
+[data-theme="dark"] .info-popup[open] summary,
+[data-theme="dark"] .ranking-row button:hover,
+[data-theme="dark"] .ranking-row button:focus-visible,
+[data-theme="dark"] .insight-row:hover,
+[data-theme="dark"] .insight-row:focus-visible { background: #294256; }
+[data-theme="dark"] .info-popup-content { box-shadow: 0 4px 18px #0009; }
+[data-theme="dark"] .ride-details,
+[data-theme="dark"] .app-footer,
+[data-theme="dark"] .profile-summary { border-color: #405364; }
+[data-theme="dark"] .ranking-row button,
+[data-theme="dark"] .insight-group { border-color: #304453; }
+[data-theme="dark"] .ranking-row.selected button { background: #48311f; }
+[data-theme="dark"] .chart-weekend { fill: #263b4c; }
+[data-theme="dark"] .chart-key.weekend { border-color: #52687a; background: #263b4c; }
+[data-theme="dark"] .app-footer { color: #90a4b5; }
+[data-theme="dark"] .app-footer a,
+[data-theme="dark"] .insight-expand { color: #7dc7f4; }
+[data-theme="dark"] .swatch { border-color: #d6e0e8; }
+[data-theme="dark"] .theme-icon { color: #dce8f0; }
+[data-theme="dark"] .data-notice { color: #ffb77f; }
 .title-row { display: flex; align-items: center; gap: 9px; }
 .high-level-actions { display: flex; gap: 5px; }
 .insights-button { padding: 4px 8px; border: 1px solid #aab9c5; border-radius: 999px; background: #edf3f7; color: #17324d; font: 700 11px/1.2 system-ui, sans-serif; cursor: pointer; }
