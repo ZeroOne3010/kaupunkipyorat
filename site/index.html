@@ -82,6 +82,13 @@
             <label><input type="radio" name="geometry" value="routes"> Routes</label>
           </fieldset>
         </div>
+        <div class="particles-row">
+          <span>Particles</span>
+          <fieldset class="segments particles-control"><legend class="visually-hidden">Animated flow particles</legend>
+            <label><input type="radio" name="particles" value="off" checked> Off</label>
+            <label><input type="radio" name="particles" value="on"> On</label>
+          </fieldset>
+        </div>
       </div>
       <p id="all-rides" class="status">—</p>
       <p id="data-notice" class="data-notice" role="status" aria-live="polite"></p>
@@ -135,6 +142,7 @@
   <script src="station-summary.js"></script>
   <script src="monthly-insights.js"></script>
   <script src="route-geometry.js"></script>
+  <script src="flow-particles.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
