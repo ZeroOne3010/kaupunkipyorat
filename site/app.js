@@ -180,7 +180,7 @@ function particleFrameData(timestamp) {
 
 function rebuildParticles(flowFeatures) {
   clearParticles();
-  if (!particlesEnabled() || document.hidden) return;
+  if (!particlesEnabled() || document.hidden || selectedId === null) return;
   flowParticles = FlowParticles.createParticles(flowFeatures.map(feature => ({
     count: feature.properties.count,
     coordinates: feature.geometry.coordinates
