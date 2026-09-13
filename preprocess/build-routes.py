@@ -256,6 +256,19 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep, time_fn=ti
     station_outputs = {}
     batch_route_index = 0
     job_started_at = time_fn()
+    next_eta_route_count = 10
+
+    def report_eta_if_due():
+        nonlocal next_eta_route_count
+        routes_completed = summary["routesSucceeded"] + summary["routesFailed"]
+        if routes_completed < next_eta_route_count or stop_requested:
+            return
+        current_time = time_fn()
+        eta = estimated_completion_time(
+            job_started_at, current_time, routes_completed, batch_route_total)
+        print(f"ETA: {eta}", flush=True)
+        next_eta_route_count += 10
+
     for index, origin in enumerate(selected, args.start_station_index):
         destinations = sorted(required[origin[0]])
         print(f"\nProcessing station index {index}\nStation: {origin[1]} (ID {origin[0]})")
@@ -320,11 +333,7 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep, time_fn=ti
                                              "consecutive routes that failed after retries")
                     stop_requested = True
                     print(f"Stopping early: {summary['stopReason']}", file=sys.stderr, flush=True)
-            if batch_route_index % 10 == 0 and not stop_requested:
-                current_time = time_fn()
-                eta = estimated_completion_time(
-                    job_started_at, current_time, batch_route_index, batch_route_total)
-                print(f"ETA: {eta}", flush=True)
+            report_eta_if_due()
             if stop_requested:
                 break
             if route_index + 1 < len(destinations):
@@ -395,6 +404,7 @@ def main(argv=None, *, request_fn=request_route, sleep_fn=time.sleep, time_fn=ti
                             summary["stopReason"] = (f"reached {args.max_consecutive_failures} "
                                                      "consecutive routes that failed after retries")
                             stop_requested = True
+                report_eta_if_due()
                 write_json(args.output / "routing-summary.json", summary)
                 if stop_requested:
                     server_error_queue.extend(pending[pending_index + 1:])

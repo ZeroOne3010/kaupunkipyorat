@@ -126,7 +126,7 @@ class BuildRoutesTests(unittest.TestCase):
             self.assertIn("Route 1/3 (station route 1/2): 1 -> 2, attempt 1", logs)
             self.assertIn("Route 3/3 (station route 1/1): 2 -> 3, attempt 1", logs)
 
-    def test_logs_eta_after_every_tenth_route_from_elapsed_time(self):
+    def test_logs_eta_after_every_tenth_completed_route_from_elapsed_time(self):
         with tempfile.TemporaryDirectory() as directory, \
                 mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             root = Path(directory)
@@ -140,12 +140,20 @@ class BuildRoutesTests(unittest.TestCase):
                           for destination_id in range(2, 13)]
             }))
             clock = iter([1_000, 1_100])
+            queued_once = False
+
+            def request(_endpoint, _key, _origin, destination):
+                nonlocal queued_once
+                if destination[0] == 11 and not queued_once:
+                    queued_once = True
+                    raise self.api_error(503)
+                return {"p": "abc", "d": 10}
 
             result = routes.main(
                 ["--stations", str(root / "stations.js"), "--data", str(data),
                  "--output", str(root / "out"), "--subscription-key", "key",
                  "--delay-ms", "0"],
-                request_fn=lambda *_: {"p": "abc", "d": 10},
+                request_fn=request,
                 sleep_fn=lambda _: None,
                 time_fn=lambda: next(clock),
             )
@@ -155,6 +163,10 @@ class BuildRoutesTests(unittest.TestCase):
                 "%H:%M:%S", routes.time.localtime(1_110))
             self.assertEqual(stdout.getvalue().count("ETA:"), 1)
             self.assertIn(f"ETA: {expected_eta}", stdout.getvalue())
+            self.assertLess(stdout.getvalue().index("Route 11/11"),
+                            stdout.getvalue().index("ETA:"))
+            self.assertLess(stdout.getvalue().index("ETA:"),
+                            stdout.getvalue().index("Initial pass complete"))
 
     def test_retries_and_records_failure(self):
         with tempfile.TemporaryDirectory() as directory:
