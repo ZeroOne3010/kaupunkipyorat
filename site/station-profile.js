@@ -4,7 +4,11 @@
 
   function monthlyHistory(stationId, monthData) {
     const dayCount = new Date(Date.UTC(monthData.y, monthData.m, 0)).getUTCDate();
-    const daily = Array.from({length: dayCount}, (_, index) => ({day: index + 1, arrivals: 0, departures: 0, roundTrips: 0, busyness: 0, netFlow: 0}));
+    const daily = Array.from({length: dayCount}, (_, index) => {
+      const day = index + 1;
+      const weekday = new Date(Date.UTC(monthData.y, monthData.m - 1, day)).getUTCDay();
+      return {day, isWeekend: weekday === 0 || weekday === 6, arrivals: 0, departures: 0, roundTrips: 0, busyness: 0, netFlow: 0};
+    });
     const hourlyTypical = Array.from({length: 24}, (_, hour) => ({hour, arrivals: 0, departures: 0}));
 
     (monthData.d || []).slice(0, dayCount).forEach((tuples, dayIndex) => {
@@ -47,9 +51,12 @@
     const svg = svgElement("svg", {viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": options.label});
     svg.classList.add("history-chart");
     const baseline = y(0);
-    svg.append(svgElement("line", {x1: left, x2: width - right, y1: baseline, y2: baseline, class: "chart-baseline"}));
     const count = options.series[0].values.length;
     const groupWidth = innerWidth / count;
+    (options.weekends || []).forEach(index => svg.append(svgElement("rect", {
+      x: left + index * groupWidth, y: top, width: groupWidth, height: innerHeight, class: "chart-weekend"
+    })));
+    svg.append(svgElement("line", {x1: left, x2: width - right, y1: baseline, y2: baseline, class: "chart-baseline"}));
     options.series.forEach((series, seriesIndex) => series.values.forEach((value, index) => {
       const seriesWidth = groupWidth / options.series.length;
       const padding = Math.min(2, seriesWidth * .15);
@@ -101,14 +108,16 @@
     const dayLabel = day => dateForDay(day).toLocaleDateString(undefined, {weekday: "short", day: "numeric", month: "short", timeZone: "UTC"});
     const dayTicks = history.daily.map((item, index) => [index, item.day]).filter(([index]) => index === 0 || (index + 1) % 5 === 0 || index === history.daily.length - 1);
     renderChart(container.daily, {label: "Trips by calendar day", series: [{className: "activity", values: history.daily.map(day => day.busyness)}],
-      points: history.daily.map(day => ({tooltip: `${dayLabel(day.day)} · ${day.busyness.toLocaleString()} trips`})), ticks: dayTicks, onSelect: index => callbacks.day(history.daily[index].day)});
+      points: history.daily.map(day => ({tooltip: `${dayLabel(day.day)} · ${day.busyness.toLocaleString()} trips`})),
+      weekends: history.daily.flatMap((day, index) => day.isWeekend ? [index] : []), ticks: dayTicks, onSelect: index => callbacks.day(history.daily[index].day)});
     const average = value => value.toLocaleString(undefined, {maximumFractionDigits: 1});
     renderChart(container.hourly, {label: "Typical day average arrivals and departures by hour", series: [
       {className: "arrivals", values: history.hourlyTypical.map(hour => hour.arrivals)}, {className: "departures", values: history.hourlyTypical.map(hour => hour.departures)}],
       points: history.hourlyTypical.map(item => ({tooltip: `${String(item.hour).padStart(2, "0")}:00–${String((item.hour + 1) % 24).padStart(2, "0")}:00 · ${average(item.arrivals)} average arrivals · ${average(item.departures)} average departures`})),
       ticks: [0, 4, 8, 12, 16, 20, 23].map(hour => [hour, String(hour).padStart(2, "0")]), onSelect: callbacks.hour});
     renderChart(container.net, {label: "Daily net flow", centered: true, series: [{className: "net", values: history.daily.map(day => day.netFlow)}],
-      points: history.daily.map(day => ({tooltip: `${dayLabel(day.day)} · Net flow ${day.netFlow > 0 ? "+" : ""}${day.netFlow.toLocaleString()}`})), ticks: dayTicks, onSelect: index => callbacks.day(history.daily[index].day)});
+      points: history.daily.map(day => ({tooltip: `${dayLabel(day.day)} · Net flow ${day.netFlow > 0 ? "+" : ""}${day.netFlow.toLocaleString()}`})),
+      weekends: history.daily.flatMap((day, index) => day.isWeekend ? [index] : []), ticks: dayTicks, onSelect: index => callbacks.day(history.daily[index].day)});
   }
 
   root.StationProfile = {monthlyHistory, render};

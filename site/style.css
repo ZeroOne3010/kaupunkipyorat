@@ -152,6 +152,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .profile-chart-section > p { margin: 2px 0 6px; color: #526a7e; font-size: 12px; }
 .profile-chart { position: relative; width: 100%; }
 .history-chart { display: block; width: 100%; height: auto; min-height: 170px; overflow: visible; }
+.chart-weekend { fill: #edf3f7; }
 .chart-baseline { stroke: #8193a2; stroke-width: 1.5; }
 .chart-bar { fill: #547fa1; }
 .chart-bar.arrivals, .chart-key.arrivals { fill: #2f9e72; background: #2f9e72; }
@@ -164,6 +165,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .chart-axis-label { fill: #526a7e; font: 11px system-ui, sans-serif; text-anchor: middle; }
 .chart-value-label { fill: #526a7e; font: 10px system-ui, sans-serif; text-anchor: end; }
 .chart-key { display: inline-block; width: 9px; height: 9px; margin: 0 3px 0 8px; border-radius: 2px; }
+.chart-key.weekend { border: 1px solid #d9e1e7; background: #edf3f7; box-sizing: border-box; }
 .chart-key:first-child { margin-left: 0; }
 .chart-tooltip { position: absolute; z-index: 1; top: 7px; max-width: 190px; transform: translateX(-50%); padding: 5px 7px; border-radius: 5px; background: #17324d; color: white; font-size: 11px; pointer-events: none; white-space: nowrap; }
 @media (max-width: 560px) {

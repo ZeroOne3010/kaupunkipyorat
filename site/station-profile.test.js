@@ -13,7 +13,7 @@ test("monthly history includes every day and all hours with shared station seman
   const history = monthlyHistory(1, {y: 2025, m: 10, d, h});
 
   assert.equal(history.daily.length, 31);
-  assert.deepEqual(history.daily[0], {day: 1, arrivals: 7, departures: 5, roundTrips: 2, busyness: 10, netFlow: 2});
+  assert.deepEqual(history.daily[0], {day: 1, isWeekend: false, arrivals: 7, departures: 5, roundTrips: 2, busyness: 10, netFlow: 2});
   assert.equal(history.daily[1].busyness, 0);
   assert.equal(history.daily[2].busyness, 4);
   assert.equal(history.hourlyTypical.length, 24);
@@ -34,4 +34,10 @@ test("typical-day buckets average activity over every represented calendar day",
 test("monthly history uses the calendar length from the data month", () => {
   assert.equal(monthlyHistory(1, {y: 2024, m: 2, d: [], h: []}).daily.length, 29);
   assert.equal(monthlyHistory(1, {y: 2025, m: 2, d: [], h: []}).daily.length, 28);
+});
+
+test("monthly history identifies weekends using the data month calendar", () => {
+  const history = monthlyHistory(1, {y: 2025, m: 8, d: [], h: []});
+
+  assert.deepEqual(history.daily.filter(day => day.isWeekend).map(day => day.day), [2, 3, 9, 10, 16, 17, 23, 24, 30, 31]);
 });
