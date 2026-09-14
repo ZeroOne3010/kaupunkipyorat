@@ -1,0 +1,36 @@
+name: Build historical weather
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: City-bike season year (2016 through the current year)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  weather:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate year
+        env:
+          YEAR: ${{ inputs.year }}
+        run: |
+          [[ "$YEAR" =~ ^[0-9]{4}$ ]] || { echo "year must contain four digits" >&2; exit 1; }
+          (( YEAR >= 2016 && YEAR <= $(date -u +%Y) )) || { echo "year must be between 2016 and the current year" >&2; exit 1; }
+      - name: Download, aggregate, and validate ERA5 weather
+        env:
+          YEAR: ${{ inputs.year }}
+        run: python preprocess/build-weather.py "$YEAR" "weather/$YEAR.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weather-${{ inputs.year }}
+          path: weather/${{ inputs.year }}.json
+          if-no-files-found: error

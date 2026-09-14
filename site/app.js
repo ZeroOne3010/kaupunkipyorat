@@ -13,6 +13,8 @@ const routeRequests = new Map();
 const unavailableRoutes = new Set();
 const decodedRouteCache = new Map();
 const stationProfileCache = new Map();
+const weatherCache = new Map();
+let weatherRequestId = 0;
 const MAX_FLOW_PARTICLES = 150;
 const PARTICLE_SPEED_METERS_PER_SECOND = 95;
 let flowParticles = [];
@@ -142,6 +144,39 @@ function updateNavigationButtons() {
   document.querySelectorAll(".time-navigation button").forEach(button => {
     button.disabled = !navigationTarget(button.dataset.unit, Number(button.dataset.step));
   });
+}
+
+function loadWeather(year) {
+  if (!weatherCache.has(year)) {
+    weatherCache.set(year, fetch(`weather/${year}.json`).then(async response => {
+      if (!response.ok) return null;
+      const payload = await response.json();
+      return payload?.v === 1 && payload.year === year ? payload : null;
+    }).catch(() => null));
+  }
+  return weatherCache.get(year);
+}
+
+async function updateWeatherSummary() {
+  const requestId = ++weatherRequestId;
+  const section = document.querySelector("#weather-summary");
+  if (selectedId === null || !selectedDate) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = true;
+  const year = selectedDate.getUTCFullYear();
+  const payload = await loadWeather(year);
+  if (requestId !== weatherRequestId) return;
+  if (selectedId === null || selectedDate.getUTCFullYear() !== year || !payload) {
+    section.hidden = true;
+    return;
+  }
+  const station = stationById.get(selectedId);
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  const tuple = Weather.weatherForSelection(payload, station.lon, selectedDate, mode);
+  Weather.render(document.querySelector("#weather-value"), tuple, mode);
+  section.hidden = false;
 }
 
 function navigationTarget(unit, amount) {
@@ -275,6 +310,7 @@ function update() {
     renderRanking("#top-outgoing", rankedConnections(tuples, true), stationStats.departures);
     renderRanking("#top-incoming", rankedConnections(tuples, false), stationStats.arrivals);
   }
+  updateWeatherSummary();
 }
 
 async function loadData(dataFile) {
