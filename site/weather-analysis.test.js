@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {observations, summarize, tooltip, trapFocus} = require("./weather-analysis.js");
+const {observations, summarize, periodLabel, availablePeriodTarget, tooltip, trapFocus} = require("./weather-analysis.js");
 
 const history = {daily: [
   {busyness: 100}, {busyness: 200}, {busyness: 300}, {busyness: 400}
@@ -69,4 +69,23 @@ test("focus trap recovers focus that starts outside the dialog", () => {
   assert.equal(trapFocus(panel, event, {}), true);
   assert.equal(event.prevented, true);
   assert.equal(first.focused, true);
+});
+
+test("formats month and season periods", () => {
+  assert.equal(periodLabel("month", 2025, 6, "en"), "June 2025");
+  assert.equal(periodLabel("season", 2025, 6, "en"), "Apr–Oct 2025");
+});
+
+test("period navigation does not skip unavailable months or years", () => {
+  const months = ["2024-04", "2025-05", "2025-06", "2026-10"];
+  assert.deepEqual(availablePeriodTarget("month", 2025, 6, -1, months), {year: 2025, month: 5});
+  assert.equal(availablePeriodTarget("month", 2025, 6, 1, months), null);
+  assert.deepEqual(availablePeriodTarget("season", 2025, 6, -1, months), {year: 2024, month: 6});
+  assert.deepEqual(availablePeriodTarget("season", 2025, 6, 1, months), {year: 2026, month: 6});
+});
+
+test("season observations remain one observation per valid ride day", () => {
+  const april = observations({daily: [{busyness: 10}]}, [{temperature: 8}], 2025, 4);
+  const may = observations({daily: [{busyness: 20}, {busyness: 30}]}, [{temperature: 12}, {temperature: 13}], 2025, 5);
+  assert.deepEqual([...april, ...may].map(day => day.date), ["2025-04-01", "2025-05-01", "2025-05-02"]);
 });

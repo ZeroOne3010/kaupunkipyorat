@@ -19,6 +19,23 @@
     }).filter(day => day.rideCount !== null);
   }
 
+  function periodLabel(mode, year, month, locale) {
+    if (mode === "season") return `Apr–Oct ${year}`;
+    return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(locale, {month: "long", year: "numeric", timeZone: "UTC"});
+  }
+
+  function availablePeriodTarget(mode, year, month, amount, availableKeys) {
+    const available = new Set(availableKeys);
+    if (mode === "month") {
+      const target = new Date(Date.UTC(year, month - 1 + amount, 1));
+      return available.has(`${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, "0")}`)
+        ? {year: target.getUTCFullYear(), month: target.getUTCMonth() + 1} : null;
+    }
+    const targetYear = year + amount;
+    return [...available].some(key => Number(key.slice(0, 4)) === targetYear && Number(key.slice(5)) >= 4 && Number(key.slice(5)) <= 10)
+      ? {year: targetYear, month} : null;
+  }
+
   function summarize(days, weekdaysOnly = false) {
     const filtered = days.filter(day => !weekdaysOnly || !day.isWeekend);
     const wet = filtered.filter(day => day.precipitationMm !== null);
@@ -92,7 +109,7 @@
     return false;
   }
 
-  const api = {observations, summarize, tooltip, renderScatter, trapFocus};
+  const api = {observations, summarize, periodLabel, availablePeriodTarget, tooltip, renderScatter, trapFocus};
   root.WeatherAnalysis = api;
   if (typeof module !== "undefined") module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -14,10 +14,14 @@ const unavailableRoutes = new Set();
 const decodedRouteCache = new Map();
 const stationProfileCache = new Map();
 const weatherAnalysisCache = new Map();
+const weatherAnalysisSummaryCache = new Map();
+const analysisDataCache = new Map();
 const weatherCache = new Map();
 let weatherRequestId = 0;
 let weatherAnalysisRequestId = 0;
 let weatherAnalysisInertState = [];
+let weatherAnalysisPeriod = null;
+const weatherAnalysisRememberedMonths = new Map();
 let profileWeather = null;
 let profileWeatherContext = null;
 const MAX_FLOW_PARTICLES = 150;
@@ -327,7 +331,19 @@ async function loadData(dataFile) {
   const loadedData = await response.json();
   if (requestId !== dataRequestId) return false;
   data = loadedData;
+  if (Number.isInteger(loadedData.y) && Number.isInteger(loadedData.m)) {
+    analysisDataCache.set(`${loadedData.y}-${String(loadedData.m).padStart(2, "0")}`, Promise.resolve(loadedData));
+  }
   return true;
+}
+
+function loadAnalysisData(key) {
+  if (!analysisDataCache.has(key)) {
+    const file = availableMonths.get(key);
+    if (!file) return Promise.resolve(null);
+    analysisDataCache.set(key, fetch(`data/${file}`).then(response => response.ok ? response.json() : null).catch(() => null));
+  }
+  return analysisDataCache.get(key);
 }
 
 async function navigateTime(unit, amount) {
@@ -600,27 +616,78 @@ function renderWeatherAnalysis(summary) {
 
 async function refreshWeatherAnalysis() {
   const requestId = ++weatherAnalysisRequestId;
-  const content = document.querySelector("#weather-analysis-content"), unavailable = document.querySelector("#weather-analysis-unavailable");
+  const content = document.querySelector("#weather-analysis-content"), unavailable = document.querySelector("#weather-analysis-unavailable"), loading = document.querySelector("#weather-analysis-loading");
   if (selectedId === null || !data || !selectedDate) { content.hidden = true; unavailable.hidden = false; return; }
-  const stationId = selectedId, year = selectedDate.getUTCFullYear(), month = selectedDate.getUTCMonth() + 1;
-  const key = `${year}-${String(month).padStart(2, "0")}:${stationId}`;
+  if (!weatherAnalysisPeriod) weatherAnalysisPeriod = {mode: "month", year: selectedDate.getUTCFullYear(), month: selectedDate.getUTCMonth() + 1};
+  const {mode, year, month} = weatherAnalysisPeriod;
+  const stationId = selectedId;
+  const weekdaysOnly = document.querySelector('input[name="weather-days"]:checked').value === "weekdays";
+  const key = `${mode}:${year}:${mode === "month" ? month : "season"}:${stationId}`;
   const station = stationById.get(stationId);
-  document.querySelector("#weather-analysis-context").textContent = `${station.name} · ${selectedDate.toLocaleDateString(undefined, {month: "long", year: "numeric", timeZone: "UTC"})}`;
+  document.querySelector("#weather-analysis-station").textContent = station.name;
+  document.querySelector("#weather-analysis-context").textContent = WeatherAnalysis.periodLabel(mode, year, month);
+  updateWeatherPeriodControls();
   let days = weatherAnalysisCache.get(key);
   if (!days) {
+    loading.hidden = false;
     const payload = await loadWeather(year);
+    const months = mode === "season" ? [4, 5, 6, 7, 8, 9, 10] : [month];
+    const monthlyData = await Promise.all(months.map(value => loadAnalysisData(`${year}-${String(value).padStart(2, "0")}`)));
     if (requestId !== weatherAnalysisRequestId) return;
-    const historyKey = `${monthKey(selectedDate)}:${stationId}`;
-    if (!stationProfileCache.has(historyKey)) stationProfileCache.set(historyKey, StationProfile.monthlyHistory(stationId, data));
-    const weather = payload && Weather.dailyWeatherForMonth(payload, station.lon, new Date(Date.UTC(year, month - 1, 1)));
-    days = WeatherAnalysis.observations(stationProfileCache.get(historyKey), weather, year, month);
+    days = [];
+    months.forEach((value, index) => {
+      if (!monthlyData[index]) return;
+      const historyKey = `${year}-${String(value).padStart(2, "0")}:${stationId}`;
+      if (!stationProfileCache.has(historyKey)) stationProfileCache.set(historyKey, StationProfile.monthlyHistory(stationId, monthlyData[index]));
+      const weather = payload && Weather.dailyWeatherForMonth(payload, station.lon, new Date(Date.UTC(year, value - 1, 1)));
+      const observations = WeatherAnalysis.observations(stationProfileCache.get(historyKey), weather, year, value);
+      if (observations) days.push(...observations);
+    });
     if (days) weatherAnalysisCache.set(key, days);
   }
   if (requestId !== weatherAnalysisRequestId) return;
+  loading.hidden = true;
   if (!days) { content.hidden = true; unavailable.hidden = false; return; }
   unavailable.hidden = true; content.hidden = false;
-  const weekdaysOnly = document.querySelector('input[name="weather-days"]:checked').value === "weekdays";
-  renderWeatherAnalysis(WeatherAnalysis.summarize(days, weekdaysOnly));
+  const summaryKey = `${key}:${weekdaysOnly ? "weekdays" : "all"}`;
+  if (!weatherAnalysisSummaryCache.has(summaryKey)) weatherAnalysisSummaryCache.set(summaryKey, WeatherAnalysis.summarize(days, weekdaysOnly));
+  renderWeatherAnalysis(weatherAnalysisSummaryCache.get(summaryKey));
+}
+
+function updateWeatherPeriodControls() {
+  if (!weatherAnalysisPeriod) return;
+  const {mode, year, month} = weatherAnalysisPeriod;
+  const previous = document.querySelector("#weather-period-previous"), next = document.querySelector("#weather-period-next");
+  previous.textContent = mode === "month" ? "−1M" : "−1Y";
+  next.textContent = mode === "month" ? "+1M" : "+1Y";
+  previous.setAttribute("aria-label", mode === "month" ? "Previous month" : "Previous season");
+  next.setAttribute("aria-label", mode === "month" ? "Next month" : "Next season");
+  previous.disabled = !WeatherAnalysis.availablePeriodTarget(mode, year, month, -1, availableMonths.keys());
+  next.disabled = !WeatherAnalysis.availablePeriodTarget(mode, year, month, 1, availableMonths.keys());
+}
+
+function navigateWeatherPeriod(amount) {
+  if (!weatherAnalysisPeriod) return;
+  const target = WeatherAnalysis.availablePeriodTarget(weatherAnalysisPeriod.mode, weatherAnalysisPeriod.year, weatherAnalysisPeriod.month, amount, availableMonths.keys());
+  if (!target) return;
+  weatherAnalysisPeriod = {...weatherAnalysisPeriod, ...target};
+  if (weatherAnalysisPeriod.mode === "month") weatherAnalysisRememberedMonths.set(target.year, target.month);
+  refreshWeatherAnalysis();
+}
+
+function changeWeatherPeriodMode(mode) {
+  if (!weatherAnalysisPeriod || mode === weatherAnalysisPeriod.mode) return;
+  const {year, month} = weatherAnalysisPeriod;
+  if (mode === "season") {
+    weatherAnalysisRememberedMonths.set(year, month);
+    weatherAnalysisPeriod = {mode, year, month};
+  } else {
+    const preferred = weatherAnalysisRememberedMonths.get(year) || month;
+    const candidates = [...availableMonths.keys()].filter(key => Number(key.slice(0, 4)) === year).map(key => Number(key.slice(5)));
+    const nearest = candidates.sort((a, b) => Math.abs(a - preferred) - Math.abs(b - preferred))[0];
+    weatherAnalysisPeriod = {mode, year, month: nearest || preferred};
+  }
+  refreshWeatherAnalysis();
 }
 
 function showWeatherAnalysis() {
@@ -631,6 +698,9 @@ function showWeatherAnalysis() {
   const panel = document.querySelector("#weather-analysis"), backdrop = document.querySelector("#weather-analysis-backdrop");
   weatherAnalysisInertState = [...document.body.children].filter(element => element !== panel && element !== backdrop).map(element => [element, element.inert]);
   weatherAnalysisInertState.forEach(([element]) => { element.inert = true; });
+  weatherAnalysisPeriod = {mode: "month", year: selectedDate.getUTCFullYear(), month: selectedDate.getUTCMonth() + 1};
+  weatherAnalysisRememberedMonths.set(weatherAnalysisPeriod.year, weatherAnalysisPeriod.month);
+  document.querySelector('input[name="weather-period"][value="month"]').checked = true;
   refreshWeatherAnalysis();
   document.querySelector("#close-weather-analysis").focus();
 }
@@ -640,6 +710,9 @@ document.querySelector("#close-weather-analysis").addEventListener("click", () =
 document.querySelector("#weather-analysis-backdrop").addEventListener("click", () => hideWeatherAnalysis());
 document.querySelector("#weather-analysis").addEventListener("keydown", event => WeatherAnalysis.trapFocus(event.currentTarget, event));
 document.querySelectorAll('input[name="weather-days"], input[name="weather-metric"]').forEach(input => input.addEventListener("change", refreshWeatherAnalysis));
+document.querySelectorAll('input[name="weather-period"]').forEach(input => input.addEventListener("change", event => changeWeatherPeriodMode(event.target.value)));
+document.querySelector("#weather-period-previous").addEventListener("click", () => navigateWeatherPeriod(-1));
+document.querySelector("#weather-period-next").addEventListener("click", () => navigateWeatherPeriod(1));
 document.querySelectorAll("#top-outgoing, #top-incoming").forEach(list => list.addEventListener("click", event => {
   const button = event.target.closest("button[data-station-id]");
   if (!button) return;
