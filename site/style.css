@@ -180,6 +180,11 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 [data-theme="dark"] .swatch { border-color: #d6e0e8; }
 [data-theme="dark"] .theme-icon { color: #dce8f0; }
 [data-theme="dark"] .data-notice { color: #ffb77f; }
+[data-theme="dark"] .weather-analysis { border-color: #405364; background: #142330; box-shadow: 0 8px 36px #000b; }
+[data-theme="dark"] .weather-rain-summary > div,
+[data-theme="dark"] .temperature-bands > div { border-color: #405364; background: #1b2d3c; }
+[data-theme="dark"] .weather-point-details { background: #1b2d3c; color: #c7d4de; }
+[data-theme="dark"] .weather-axis-label { fill: #aebdca; }
 .title-row { display: flex; align-items: center; gap: 9px; }
 .high-level-actions { display: flex; gap: 5px; }
 .insights-button { padding: 4px 8px; border: 1px solid #aab9c5; border-radius: 999px; background: #edf3f7; color: #17324d; font: 700 11px/1.2 system-ui, sans-serif; cursor: pointer; }
@@ -213,6 +218,24 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .insight-stations { --insight-color: #ed6a00; }
 .profile-backdrop { position: fixed; z-index: 5; inset: 0; background: #17324d73; }
 .station-profile { position: fixed; z-index: 6; inset: 16px 50% 16px auto; width: min(720px, calc(100vw - 32px)); box-sizing: border-box; overflow-y: auto; transform: translateX(50%); padding: 18px 20px 30px; border: 1px solid #d9e1e7; border-radius: 14px; background: #fff; box-shadow: 0 8px 36px #17324d4d; }
+.weather-analysis { position: fixed; z-index: 6; inset: 16px 16px 16px auto; width: min(560px, calc(100vw - 32px)); box-sizing: border-box; overflow-y: auto; padding: 18px 20px 30px; border: 1px solid #d9e1e7; border-radius: 14px; background: #fff; box-shadow: 0 8px 36px #17324d4d; }
+.weather-analysis h3 { margin: 16px 0 7px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.weather-days-control, .weather-metric-control { display: flex; width: min(260px, 100%); }
+.weather-metric-control { margin-top: 18px; }
+.weather-rain-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.weather-rain-summary > div { display: grid; gap: 3px; padding: 9px; border: 1px solid #d9e1e7; border-radius: 8px; background: #f6f9fb; font-size: 11px; }
+.weather-rain-summary strong { font-size: 13px; }
+#weather-scatter { min-height: 210px; color: #526a7e; font-size: 12px; }
+.weather-scatter-svg { display: block; width: 100%; height: auto; }
+.weather-axis { stroke: #8193a2; stroke-width: 1; }
+.weather-axis-label { fill: #526a7e; font: 11px system-ui, sans-serif; text-anchor: middle; }
+.weather-point { fill: #ed6a00; fill-opacity: .58; stroke: #fff; stroke-width: 1; cursor: pointer; }
+.weather-point.rain { fill: #1683cf; fill-opacity: .48; }
+.weather-point:hover, .weather-point:focus, .weather-point.selected { fill-opacity: 1; stroke: #17324d; stroke-width: 2; outline: none; }
+.weather-point-details { min-height: 54px; margin: 2px 0 0; padding: 7px 9px; border-radius: 7px; background: #edf3f7; color: #334f65; font-size: 12px; white-space: pre-line; }
+.temperature-bands { display: grid; gap: 5px; }
+.temperature-bands > div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 9px; border-radius: 6px; background: #f6f9fb; font-size: 12px; }
+.temperature-bands strong { min-width: 54px; }
 .profile-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .profile-heading h2 { font-size: 22px; }
 .profile-month { margin: 3px 0 10px; color: #526a7e; font-size: 16px; font-weight: 700; }
@@ -256,5 +279,8 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
   .high-level-actions { gap: 3px; }
   .insights-button { padding-inline: 6px; }
   .station-profile { inset: 0; width: 100%; transform: none; border: 0; border-radius: 0; padding: 15px 12px max(24px, env(safe-area-inset-bottom)); }
+  .weather-analysis { inset: auto 0 0; width: 100%; max-height: 92vh; border-radius: 16px 16px 0 0; padding: 15px 12px max(24px, env(safe-area-inset-bottom)); }
+  .weather-rain-summary { grid-template-columns: 1fr; gap: 4px; }
+  .weather-rain-summary > div { display: flex; justify-content: space-between; }
   .history-chart { min-height: 155px; }
 }
