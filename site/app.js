@@ -477,6 +477,16 @@ function renderDayStationProfile(stationId, day, weather = null) {
     hour => stationProfileNavigate("hour", hour));
 }
 
+function renderMonthStationProfile(history, weather = null) {
+  const enabled = document.querySelector('input[name="profile-weather"]:checked').value === "on";
+  document.querySelector("#profile-daily-description").innerHTML = `Trips involving this station · <span class="chart-key weekend"></span>Weekend${enabled ? ' · <span class="chart-key precipitation"></span>Rain <span class="chart-key temperature"></span>Temperature' : ""}`;
+  StationProfile.render({
+    daily: document.querySelector("#profile-daily-chart"), hourly: document.querySelector("#profile-hourly-chart"), net: document.querySelector("#profile-net-chart")
+  }, history, selectedDate, {
+    day: day => stationProfileNavigate("day", day), hour: hour => stationProfileNavigate("hour", hour)
+  }, enabled ? weather : null);
+}
+
 function stationProfileNavigate(mode, value) {
   hideStationProfile(false);
   closeInsightVisualization();
@@ -511,7 +521,9 @@ function showStationProfile() {
   ].map(text => { const row = document.createElement("p"); row.textContent = text; return row; }));
   document.querySelector("#profile-daily-section").hidden = isDay;
   document.querySelector("#profile-net-section").hidden = isDay;
-  document.querySelector("#profile-weather-control").hidden = !isDay;
+  const weatherControl = document.querySelector("#profile-weather-control");
+  weatherControl.hidden = false;
+  (isDay ? document.querySelector("#profile-hourly-title").parentElement : document.querySelector("#profile-daily-heading")).append(weatherControl);
   document.querySelector("#profile-hourly-title").textContent = isDay ? "Activity by hour" : "Typical day";
   document.querySelector("#profile-hourly-description").innerHTML = `${isDay ? "Trips during the selected day" : "Average per day"} · <span class="chart-key arrivals"></span>Arrivals <span class="chart-key departures"></span>Departures`;
   if (isDay) {
@@ -525,11 +537,14 @@ function showStationProfile() {
       renderDayStationProfile(selectedId, selectedDate.getUTCDate(), profileWeather);
     });
   } else {
-    profileWeatherContext = null;
-    StationProfile.render({
-      daily: document.querySelector("#profile-daily-chart"), hourly: document.querySelector("#profile-hourly-chart"), net: document.querySelector("#profile-net-chart")
-    }, stationProfileCache.get(key), selectedDate, {
-      day: day => stationProfileNavigate("day", day), hour: hour => stationProfileNavigate("hour", hour)
+    const context = `${selectedId}:${monthKey(selectedDate)}`;
+    profileWeatherContext = context;
+    profileWeather = null;
+    renderMonthStationProfile(stationProfileCache.get(key));
+    loadWeather(selectedDate.getUTCFullYear()).then(payload => {
+      if (profileWeatherContext !== context || !payload) return;
+      profileWeather = Weather.dailyWeatherForMonth(payload, station.lon, selectedDate);
+      renderMonthStationProfile(stationProfileCache.get(key), profileWeather);
     });
   }
   document.querySelector("#station-profile").hidden = false;
@@ -539,7 +554,10 @@ function showStationProfile() {
 
 document.querySelector("#open-station-profile").addEventListener("click", showStationProfile);
 document.querySelectorAll('input[name="profile-weather"]').forEach(input => input.addEventListener("change", () => {
-  if (profileWeatherContext && selectedId !== null) renderDayStationProfile(selectedId, selectedDate.getUTCDate(), profileWeather);
+  if (!profileWeatherContext || selectedId === null) return;
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  if (mode === "day") renderDayStationProfile(selectedId, selectedDate.getUTCDate(), profileWeather);
+  else renderMonthStationProfile(stationProfileCache.get(`${monthKey(selectedDate)}:${selectedId}`), profileWeather);
 }));
 document.querySelector("#close-station-profile").addEventListener("click", () => hideStationProfile());
 document.querySelector("#station-profile-backdrop").addEventListener("click", () => hideStationProfile());

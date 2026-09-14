@@ -32,6 +32,26 @@
     });
   }
 
+  function dailyWeatherForMonth(payload, longitude, date) {
+    if (!payload || payload.v !== 1 || payload.year !== date.getUTCFullYear()) return null;
+    const city = payload.cities?.[cityForLongitude(longitude)];
+    if (!city?.days) return null;
+    const year = date.getUTCFullYear(), month = date.getUTCMonth();
+    const dayCount = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    return Array.from({length: dayCount}, (_, index) => {
+      const dateKey = new Date(Date.UTC(year, month, index + 1)).toISOString().slice(0, 10);
+      const tuple = city.days[dateKey]?.d;
+      const measurement = position => typeof tuple?.[position] === "number" && Number.isFinite(tuple[position]) ? tuple[position] : null;
+      return {
+        date: dateKey,
+        temperature: measurement(0),
+        minimumTemperature: measurement(1),
+        maximumTemperature: measurement(2),
+        precipitation: measurement(3)
+      };
+    });
+  }
+
   function number(value, options) {
     return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString(undefined, options) : null;
   }
@@ -93,7 +113,7 @@
     });
   }
 
-  const api = {ESPOO_LONGITUDE_LIMIT, cityForLongitude, weatherForSelection, hourlyWeatherForDay, displayParts, render};
+  const api = {ESPOO_LONGITUDE_LIMIT, cityForLongitude, weatherForSelection, hourlyWeatherForDay, dailyWeatherForMonth, displayParts, render};
   root.Weather = api;
   if (typeof module !== "undefined") module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
