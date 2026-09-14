@@ -120,7 +120,8 @@ DIGITRANSIT_SUBSCRIPTION_KEY=... \
 
 Run **Actions → Build historical weather → Run workflow** with one city-bike year
 (for example `2025`) to download hourly Open-Meteo ERA5 reanalysis data for
-Helsinki and Espoo. The manual job covers April 1 through October 31 in UTC,
+Helsinki and Espoo. The manual job covers April 1 through October 31 using the
+Helsinki local clock (matching the trip-data buckets),
 calculates daily and monthly aggregates, validates the compact JSON, reports
 incomplete observations as warnings, and uploads a `weather-YYYY` artifact. It
 never commits generated data.

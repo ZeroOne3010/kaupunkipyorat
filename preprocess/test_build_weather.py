@@ -2,7 +2,9 @@ import importlib.util
 import io
 import math
 import unittest
+import urllib.parse
 from pathlib import Path
+from unittest import mock
 
 
 SPEC = importlib.util.spec_from_file_location("build_weather", Path(__file__).with_name("build-weather.py"))
@@ -68,6 +70,22 @@ class WeatherBuilderTests(unittest.TestCase):
         payload = weather.build(2025, fetcher, io.StringIO())
         self.assertEqual(calls, [(2025, weather.CITIES["helsinki"]), (2025, weather.CITIES["espoo"])])
         weather.validate(payload)
+
+    def test_fetch_uses_the_helsinki_clock_matching_trip_buckets(self):
+        class Response:
+            def __enter__(self):
+                return self
+            def __exit__(self, *_args):
+                return None
+            def read(self):
+                return b'{"hourly": {}}'
+
+        with mock.patch.object(weather.urllib.request, "urlopen", return_value=Response()) as urlopen:
+            weather.fetch_city(2025, weather.CITIES["helsinki"])
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(urlopen.call_args.args[0].full_url).query)
+        self.assertEqual(query["timezone"], ["Europe/Helsinki"])
+        self.assertEqual(query["start_date"], ["2025-04-01"])
+        self.assertEqual(query["end_date"], ["2025-10-31"])
 
 
 if __name__ == "__main__":

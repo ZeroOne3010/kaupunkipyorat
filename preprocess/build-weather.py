@@ -32,7 +32,9 @@ def fetch_city(year, coordinates, endpoint=ENDPOINT):
         "latitude": coordinates[0], "longitude": coordinates[1],
         "start_date": f"{year}-04-01", "end_date": f"{year}-10-31",
         "hourly": ",".join(MEASUREMENTS), "wind_speed_unit": "ms",
-        "timezone": "UTC", "models": "era5",
+        # Trip preprocessing buckets the published departure clock directly, so
+        # weather timestamps must use that same Helsinki local clock.
+        "timezone": "Europe/Helsinki", "models": "era5",
     }
     url = f"{endpoint}?{urllib.parse.urlencode(params)}"
     request = urllib.request.Request(url, headers={"User-Agent": "kaupunkipyorat-weather-builder/1.0"})

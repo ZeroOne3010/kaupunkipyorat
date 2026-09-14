@@ -14,6 +14,7 @@ const unavailableRoutes = new Set();
 const decodedRouteCache = new Map();
 const stationProfileCache = new Map();
 const weatherCache = new Map();
+let weatherRequestId = 0;
 const MAX_FLOW_PARTICLES = 150;
 const PARTICLE_SPEED_METERS_PER_SECOND = 95;
 let flowParticles = [];
@@ -157,13 +158,16 @@ function loadWeather(year) {
 }
 
 async function updateWeatherSummary() {
+  const requestId = ++weatherRequestId;
   const section = document.querySelector("#weather-summary");
   if (selectedId === null || !selectedDate) {
     section.hidden = true;
     return;
   }
+  section.hidden = true;
   const year = selectedDate.getUTCFullYear();
   const payload = await loadWeather(year);
+  if (requestId !== weatherRequestId) return;
   if (selectedId === null || selectedDate.getUTCFullYear() !== year || !payload) {
     section.hidden = true;
     return;
@@ -305,10 +309,8 @@ function update() {
     document.querySelector("#unique-origins").textContent = `${stationStats.uniqueOrigins.toLocaleString()} unique`;
     renderRanking("#top-outgoing", rankedConnections(tuples, true), stationStats.departures);
     renderRanking("#top-incoming", rankedConnections(tuples, false), stationStats.arrivals);
-    updateWeatherSummary();
-  } else {
-    document.querySelector("#weather-summary").hidden = true;
   }
+  updateWeatherSummary();
 }
 
 async function loadData(dataFile) {
