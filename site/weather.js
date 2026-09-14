@@ -17,6 +17,21 @@
     return day.h?.[date.getUTCHours()] ?? null;
   }
 
+  function hourlyWeatherForDay(payload, longitude, date) {
+    if (!payload || payload.v !== 1 || payload.year !== date.getUTCFullYear()) return null;
+    const city = payload.cities?.[cityForLongitude(longitude)];
+    const hours = city?.days?.[date.toISOString().slice(0, 10)]?.h;
+    if (!Array.isArray(hours)) return null;
+    return Array.from({length: 24}, (_, hour) => {
+      const tuple = hours[hour];
+      if (!Array.isArray(tuple) || tuple.length === 0) return {temperature: null, precipitation: null};
+      return {
+        temperature: typeof tuple[0] === "number" && Number.isFinite(tuple[0]) ? tuple[0] : null,
+        precipitation: typeof tuple[1] === "number" && Number.isFinite(tuple[1]) ? tuple[1] : null
+      };
+    });
+  }
+
   function number(value, options) {
     return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString(undefined, options) : null;
   }
@@ -78,7 +93,7 @@
     });
   }
 
-  const api = {ESPOO_LONGITUDE_LIMIT, cityForLongitude, weatherForSelection, displayParts, render};
+  const api = {ESPOO_LONGITUDE_LIMIT, cityForLongitude, weatherForSelection, hourlyWeatherForDay, displayParts, render};
   root.Weather = api;
   if (typeof module !== "undefined") module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

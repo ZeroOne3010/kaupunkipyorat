@@ -44,15 +44,16 @@
     </header>
     <p id="profile-month" class="profile-month">—</p>
     <div id="profile-summary" class="profile-summary"></div>
-    <section class="profile-chart-section">
+    <section id="profile-daily-section" class="profile-chart-section">
       <h3>Activity by day</h3><p>Trips involving this station · <span class="chart-key weekend"></span>Weekend</p>
       <div id="profile-daily-chart" class="profile-chart"></div>
     </section>
     <section class="profile-chart-section">
-      <h3>Typical day</h3><p>Average per day · <span class="chart-key arrivals"></span>Arrivals <span class="chart-key departures"></span>Departures</p>
+      <div class="profile-chart-heading"><h3 id="profile-hourly-title">Typical day</h3><fieldset id="profile-weather-control" class="segments weather-control" hidden><legend>Weather</legend><label><input type="radio" name="profile-weather" value="off" checked>Off</label><label><input type="radio" name="profile-weather" value="on">On</label></fieldset></div>
+      <p id="profile-hourly-description">Average per day · <span class="chart-key arrivals"></span>Arrivals <span class="chart-key departures"></span>Departures</p>
       <div id="profile-hourly-chart" class="profile-chart"></div>
     </section>
-    <section class="profile-chart-section">
+    <section id="profile-net-section" class="profile-chart-section">
       <h3>Net flow by day</h3><p>Arrivals minus departures · <span class="chart-key weekend"></span>Weekend</p>
       <div id="profile-net-chart" class="profile-chart"></div>
     </section>

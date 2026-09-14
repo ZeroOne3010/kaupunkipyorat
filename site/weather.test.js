@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {ESPOO_LONGITUDE_LIMIT, cityForLongitude, weatherForSelection, displayParts} = require("./weather.js");
+const {ESPOO_LONGITUDE_LIMIT, cityForLongitude, weatherForSelection, hourlyWeatherForDay, displayParts} = require("./weather.js");
 
 const payload = {v: 1, year: 2025, cities: {
   helsinki: {days: {"2025-04-01": {h: [[12.4, 0.7, 5.2, 225], []], d: [12, 8, 16, 4.8, 4.6, 225]}}, months: {"04": [10, 1, 20, 40, 4, 359]}},
@@ -27,4 +27,15 @@ test("preserves unavailable hours and omits missing measurement text", () => {
   assert.deepEqual(displayParts([8, null, null, null], "hour"), {
     temperature: "8.0 °C", precipitation: null, speed: null, direction: null
   });
+});
+
+test("hourly day weather preserves missing observations and measurements", () => {
+  const date = new Date(Date.UTC(2025, 3, 1, 12));
+  const weather = hourlyWeatherForDay(payload, 25, date);
+
+  assert.equal(weather.length, 24);
+  assert.deepEqual(weather[0], {temperature: 12.4, precipitation: 0.7});
+  assert.deepEqual(weather[1], {temperature: null, precipitation: null});
+  assert.deepEqual(weather[23], {temperature: null, precipitation: null});
+  assert.deepEqual(hourlyWeatherForDay(payload, 24, date)[0], {temperature: 8, precipitation: null});
 });
