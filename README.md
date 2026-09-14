@@ -116,6 +116,27 @@ DIGITRANSIT_SUBSCRIPTION_KEY=... \
   python preprocess/build-routes.py --start-station-index 0 --max-stations 1 --delay-ms 750
 ```
 
+## Historical weather
+
+Run **Actions → Build historical weather → Run workflow** with one city-bike year
+(for example `2025`) to download hourly Open-Meteo ERA5 reanalysis data for
+Helsinki and Espoo. The manual job covers April 1 through October 31 in UTC,
+calculates daily and monthly aggregates, validates the compact JSON, reports
+incomplete observations as warnings, and uploads a `weather-YYYY` artifact. It
+never commits generated data.
+
+Place the artifact's `YYYY.json` in `site/weather/`. The browser loads that year
+only when it is needed and shows weather in Station Summary. A station longitude
+below `24.8474184` uses Espoo weather; every other station uses Helsinki weather.
+Missing weather files or measurements do not affect trip visualization.
+
+The builder can also be run locally (it requires network access):
+
+```sh
+python preprocess/build-weather.py 2025 weather/2025.json
+cp weather/2025.json site/weather/
+```
+
 Trip CSVs are published through [HSL's open data resources](https://www.hsl.fi/en/hsl/open-data).
 
 ## Deployment
@@ -128,7 +149,7 @@ Enable **GitHub Actions** as the Pages source in repository settings once.
 - complete pre-generated cycling route coverage
 - animations/particles
 - PMTiles/vector tiles
-- weather joins
+- weather-specific analysis and charts
 - advanced statistics
 - automatic ingestion of newly published months
 

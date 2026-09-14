@@ -95,6 +95,9 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .ride-details div { display: grid; grid-template-columns: 82px 1fr; }
 .ride-details dt { color: #526a7e; }
 .ride-details dd { margin: 0; font-weight: 700; }
+.weather-summary { margin: -3px 0 12px; padding-bottom: 9px; border-bottom: 1px solid #d9e1e7; }
+.weather-summary p { margin: 2px 0 0; font-weight: 700; }
+.wind-arrow { display: inline-block; transform-origin: center; }
 .summary-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .summary h3 { margin: 0; font-size: 12px; }
 .summary .unique-count { margin: 0 0 4px; color: #526a7e; font-size: 11px; }
@@ -163,6 +166,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 [data-theme="dark"] .insight-row:focus-visible { background: #294256; }
 [data-theme="dark"] .info-popup-content { box-shadow: 0 4px 18px #0009; }
 [data-theme="dark"] .ride-details,
+[data-theme="dark"] .weather-summary,
 [data-theme="dark"] .app-footer,
 [data-theme="dark"] .profile-summary { border-color: #405364; }
 [data-theme="dark"] .ranking-row button,
