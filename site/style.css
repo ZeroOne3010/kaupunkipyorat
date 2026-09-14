@@ -238,6 +238,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .chart-bar.net.neutral { fill: #8193a2; }
 .chart-precipitation { fill: #1683cf; opacity: .2; }
 .chart-temperature { fill: none; stroke: #ed6a00; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: .72; pointer-events: none; }
+.chart-temperature-range { fill: #ed6a00; opacity: .09; stroke: none; pointer-events: none; }
 .chart-temperature-label { fill: #a34a00; font: 9px system-ui, sans-serif; text-anchor: start; }
 .chart-target { fill: transparent; cursor: pointer; }
 .chart-target:hover, .chart-target:focus { fill: #1683cf10; outline: none; }

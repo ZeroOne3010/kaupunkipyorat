@@ -91,12 +91,26 @@
       svg.append(bar);
     }));
     if (weather) {
-      const temperatures = weather.map(item => item.temperature).filter(value => value !== null);
+      const temperatures = weather.flatMap(item => [item.temperature, item.minimumTemperature, item.maximumTemperature])
+        .filter(value => value !== null && value !== undefined);
       if (temperatures.length) {
         let temperatureMinimum = Math.min(...temperatures), temperatureMaximum = Math.max(...temperatures);
         const padding = Math.max(1, (temperatureMaximum - temperatureMinimum) * .1);
         temperatureMinimum -= padding; temperatureMaximum += padding;
         const temperatureY = value => top + (temperatureMaximum - value) / (temperatureMaximum - temperatureMinimum) * innerHeight;
+        let range = [];
+        const drawRange = () => {
+          if (!range.length) return;
+          const upper = range.map(([index, item]) => `${left + (index + .5) * groupWidth},${temperatureY(item.maximumTemperature)}`);
+          const lower = range.slice().reverse().map(([index, item]) => `${left + (index + .5) * groupWidth},${temperatureY(item.minimumTemperature)}`);
+          svg.append(svgElement("path", {d: `M${upper.join(" L")} L${lower.join(" L")} Z`, class: "chart-temperature-range"}));
+          range = [];
+        };
+        weather.forEach((item, index) => {
+          if (item.minimumTemperature === null || item.minimumTemperature === undefined || item.maximumTemperature === null || item.maximumTemperature === undefined) drawRange();
+          else range.push([index, item]);
+        });
+        drawRange();
         let path = "";
         weather.forEach((item, index) => {
           if (item.temperature === null) { path = ""; return; }
@@ -148,12 +162,20 @@
   }
   function hideTooltip(container) { const tooltip = container.querySelector(".chart-tooltip"); if (tooltip) tooltip.hidden = true; }
 
-  function render(container, history, date, callbacks) {
+  function render(container, history, date, callbacks, weather = null) {
     const dateForDay = day => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), day));
     const dayLabel = day => dateForDay(day).toLocaleDateString(undefined, {weekday: "short", day: "numeric", month: "short", timeZone: "UTC"});
     const dayTicks = history.daily.map((item, index) => [index, item.day]).filter(([index]) => index === 0 || (index + 1) % 5 === 0 || index === history.daily.length - 1);
-    renderChart(container.daily, {label: "Trips by calendar day", series: [{className: "activity", values: history.daily.map(day => day.busyness)}],
-      points: history.daily.map(day => ({tooltip: `${dayLabel(day.day)} · ${day.busyness.toLocaleString()} trips`})),
+    const decimal = value => value.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1});
+    renderChart(container.daily, {label: `Trips by calendar day${weather ? ", with temperature and precipitation" : ""}`, series: [{className: "activity", values: history.daily.map(day => day.busyness)}],
+      weather, points: history.daily.map((day, index) => {
+        const lines = [dayLabel(day.day), `${day.busyness.toLocaleString()} trips`];
+        const observation = weather?.[index];
+        if (observation?.temperature !== null && observation?.temperature !== undefined) lines.push(`${decimal(observation.temperature)} °C avg`);
+        if (observation?.minimumTemperature !== null && observation?.minimumTemperature !== undefined && observation?.maximumTemperature !== null && observation?.maximumTemperature !== undefined) lines.push(`${decimal(observation.minimumTemperature)}–${decimal(observation.maximumTemperature)} °C`);
+        if (observation?.precipitation !== null && observation?.precipitation !== undefined) lines.push(observation.precipitation === 0 ? "0 mm precipitation" : `${decimal(observation.precipitation)} mm precipitation`);
+        return {tooltip: lines.join("\n")};
+      }),
       weekends: history.daily.flatMap((day, index) => day.isWeekend ? [index] : []), ticks: dayTicks, onSelect: index => callbacks.day(history.daily[index].day)});
     const average = value => value.toLocaleString(undefined, {maximumFractionDigits: 1});
     renderChart(container.hourly, {label: "Typical day average arrivals and departures by hour", series: [
