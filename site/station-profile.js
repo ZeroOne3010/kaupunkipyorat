@@ -34,6 +34,18 @@
     return {daily, hourlyTypical};
   }
 
+  function dailyHistory(stationId, monthData, day) {
+    return Array.from({length: 24}, (_, hour) => {
+      const item = {hour, arrivals: 0, departures: 0};
+      const tuples = monthData.h?.[(day - 1) * 24 + hour] || [];
+      tuples.forEach(([origin, destination, count]) => {
+        if (origin === stationId) item.departures += count;
+        if (destination === stationId) item.arrivals += count;
+      });
+      return item;
+    });
+  }
+
   function svgElement(name, attributes = {}) {
     const element = document.createElementNS(SVG_NS, name);
     Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
@@ -41,7 +53,8 @@
   }
 
   function renderChart(container, options) {
-    const width = 640, height = 220, left = 42, right = 10, top = 14, bottom = 31;
+    const weather = options.weather;
+    const width = 640, height = 220, left = 42, right = weather ? 42 : 10, top = 14, bottom = 31;
     const innerWidth = width - left - right, innerHeight = height - top - bottom;
     const values = options.series.flatMap(series => series.values);
     const minimum = options.centered ? Math.min(0, ...values) : 0;
@@ -56,6 +69,15 @@
     (options.weekends || []).forEach(index => svg.append(svgElement("rect", {
       x: left + index * groupWidth, y: top, width: groupWidth, height: innerHeight, class: "chart-weekend"
     })));
+    if (weather) {
+      const wetMaximum = Math.max(0, ...weather.map(item => item.precipitation ?? 0));
+      if (wetMaximum > 0) weather.forEach((item, index) => {
+        if (!(item.precipitation > 0)) return;
+        const rainHeight = Math.max(2, item.precipitation / wetMaximum * innerHeight * .38);
+        svg.append(svgElement("rect", {x: left + index * groupWidth + 1, y: top + innerHeight - rainHeight,
+          width: Math.max(1, groupWidth - 2), height: rainHeight, class: "chart-precipitation"}));
+      });
+    }
     svg.append(svgElement("line", {x1: left, x2: width - right, y1: baseline, y2: baseline, class: "chart-baseline"}));
     options.series.forEach((series, seriesIndex) => series.values.forEach((value, index) => {
       const seriesWidth = groupWidth / options.series.length;
@@ -68,6 +90,29 @@
       });
       svg.append(bar);
     }));
+    if (weather) {
+      const temperatures = weather.map(item => item.temperature).filter(value => value !== null);
+      if (temperatures.length) {
+        let temperatureMinimum = Math.min(...temperatures), temperatureMaximum = Math.max(...temperatures);
+        const padding = Math.max(1, (temperatureMaximum - temperatureMinimum) * .1);
+        temperatureMinimum -= padding; temperatureMaximum += padding;
+        const temperatureY = value => top + (temperatureMaximum - value) / (temperatureMaximum - temperatureMinimum) * innerHeight;
+        let path = "";
+        weather.forEach((item, index) => {
+          if (item.temperature === null) { path = ""; return; }
+          const command = path ? "L" : "M";
+          path += `${command}${left + (index + .5) * groupWidth},${temperatureY(item.temperature)} `;
+          if (!path.startsWith("M") || (weather[index + 1]?.temperature !== null && weather[index + 1] !== undefined)) return;
+          svg.append(svgElement("path", {d: path, class: "chart-temperature"})); path = "";
+        });
+        if (path) svg.append(svgElement("path", {d: path, class: "chart-temperature"}));
+        const highTemperature = svgElement("text", {x: width - right + 5, y: top + 5, class: "chart-temperature-label"});
+        highTemperature.textContent = `${temperatureMaximum.toLocaleString(undefined, {maximumFractionDigits: 1})}°`;
+        const lowTemperature = svgElement("text", {x: width - right + 5, y: height - bottom, class: "chart-temperature-label"});
+        lowTemperature.textContent = `${temperatureMinimum.toLocaleString(undefined, {maximumFractionDigits: 1})}°`;
+        svg.append(highTemperature, lowTemperature);
+      }
+    }
     options.points.forEach((point, index) => {
       const target = svgElement("rect", {x: left + index * groupWidth, y: top, width: groupWidth, height: innerHeight,
         class: "chart-target", tabindex: "0", role: "button", "aria-label": point.tooltip});
@@ -120,6 +165,22 @@
       weekends: history.daily.flatMap((day, index) => day.isWeekend ? [index] : []), ticks: dayTicks, onSelect: index => callbacks.day(history.daily[index].day)});
   }
 
-  root.StationProfile = {monthlyHistory, render};
-  if (typeof module !== "undefined") module.exports = {monthlyHistory};
+  function renderDay(container, history, weather, onSelect) {
+    const count = value => value.toLocaleString();
+    const decimal = value => value.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1});
+    renderChart(container, {label: `Arrivals and departures by hour${weather ? ", with temperature and precipitation" : ""}`, series: [
+      {className: "arrivals", values: history.map(hour => hour.arrivals)},
+      {className: "departures", values: history.map(hour => hour.departures)}
+    ], weather, points: history.map((item, hour) => {
+      const lines = [`${String(hour).padStart(2, "0")}:00–${String((hour + 1) % 24).padStart(2, "0")}:00`,
+        `${count(item.arrivals)} arrivals · ${count(item.departures)} departures`];
+      const observation = weather?.[hour];
+      if (observation?.temperature !== null && observation?.temperature !== undefined) lines.push(`${decimal(observation.temperature)} °C`);
+      if (observation?.precipitation !== null && observation?.precipitation !== undefined) lines.push(observation.precipitation === 0 ? "0 mm precipitation" : `${decimal(observation.precipitation)} mm precipitation`);
+      return {tooltip: lines.join("\n")};
+    }), ticks: [0, 4, 8, 12, 16, 20, 23].map(hour => [hour, String(hour).padStart(2, "0")]), onSelect});
+  }
+
+  root.StationProfile = {monthlyHistory, dailyHistory, render, renderDay};
+  if (typeof module !== "undefined") module.exports = {monthlyHistory, dailyHistory};
 })(typeof globalThis !== "undefined" ? globalThis : this);

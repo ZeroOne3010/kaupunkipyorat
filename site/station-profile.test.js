@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {monthlyHistory} = require("./station-profile.js");
+const {monthlyHistory, dailyHistory} = require("./station-profile.js");
 
 test("monthly history includes every day and all hours with shared station semantics", () => {
   const d = Array.from({length: 31}, () => []);
@@ -40,4 +40,15 @@ test("monthly history identifies weekends using the data month calendar", () => 
   const history = monthlyHistory(1, {y: 2025, m: 8, d: [], h: []});
 
   assert.deepEqual(history.daily.filter(day => day.isWeekend).map(day => day.day), [2, 3, 9, 10, 16, 17, 23, 24, 30, 31]);
+});
+
+test("daily history keeps all 24 local-hour buckets aligned", () => {
+  const h = Array.from({length: 3 * 24}, () => []);
+  h[24] = [[1, 2, 4], [3, 1, 6], [1, 1, 2]];
+  h[26] = [[1, 2, 7]];
+  const history = dailyHistory(1, {h}, 2);
+  assert.equal(history.length, 24);
+  assert.deepEqual(history[0], {hour: 0, arrivals: 8, departures: 6});
+  assert.deepEqual(history[1], {hour: 1, arrivals: 0, departures: 0});
+  assert.deepEqual(history[2], {hour: 2, arrivals: 0, departures: 7});
 });
