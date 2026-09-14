@@ -349,23 +349,23 @@ async function navigateTime(unit, amount) {
 }
 
 function addDataLayers() {
-  if (map.getSource("flows")) return;
-  map.addSource("flows", {type: "geojson", data: {type: "FeatureCollection", features: []}});
-  map.addLayer({id: "flows", type: "line", source: "flows", paint: {
+  const {ensureSource, ensureLayer} = MapLayerUtils;
+  ensureSource(map, "flows", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+  ensureLayer(map, {id: "flows", type: "line", source: "flows", paint: {
     "line-color": "#006bb6", "line-opacity": ["+", 0.2, ["*", 0.65, ["get", "scale"]]], "line-width": ["+", 1, ["*", 7, ["get", "scale"]]]
   }});
-  map.addSource("flow-particles", {type: "geojson", data: {type: "FeatureCollection", features: []}});
-  map.addLayer({id: "flow-particles", type: "circle", source: "flow-particles", paint: {
+  ensureSource(map, "flow-particles", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+  ensureLayer(map, {id: "flow-particles", type: "circle", source: "flow-particles", paint: {
     "circle-radius": 3, "circle-color": "#fff4b8", "circle-opacity": 0.82,
     "circle-stroke-color": "#17324d", "circle-stroke-width": 0.7
   }});
-  map.addSource("insight-flow", {type: "geojson", data: {type: "FeatureCollection", features: []}});
-  map.addLayer({id: "insight-flow", type: "line", source: "insight-flow", paint: {
+  ensureSource(map, "insight-flow", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+  ensureLayer(map, {id: "insight-flow", type: "line", source: "insight-flow", paint: {
     "line-color": "#ed6a00", "line-width": 5, "line-opacity": .9, "line-dasharray": [1.5, 1]
   }});
-  map.addSource("stations", {type: "geojson", data: stationGeoJSON()});
+  ensureSource(map, "stations", {type: "geojson", data: stationGeoJSON()});
   const stationCategories = ["neutral", "negative-low", "positive-low", "negative", "positive", "negative-strong", "positive-strong"];
-  stationCategories.forEach(category => map.addLayer({
+  stationCategories.forEach(category => ensureLayer(map, {
     id: `station-heat-${category}`,
     type: "heatmap",
     source: "stations",
@@ -379,7 +379,7 @@ function addDataLayers() {
       "heatmap-color": StationStyle.heatmapColor(category)
     }
   }));
-  map.addLayer({id: "station-heat-busyness", type: "heatmap", source: "stations", maxzoom: 12.5,
+  ensureLayer(map, {id: "station-heat-busyness", type: "heatmap", source: "stations", maxzoom: 12.5,
     filter: ["==", ["get", "colorCategory"], "busyness"], layout: {visibility: "none"}, paint: {
       "heatmap-weight": ["get", "normalizedBusyness"],
       "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 10, 1.5, 12, 2.4],
@@ -388,7 +388,7 @@ function addDataLayers() {
       "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
         0, "rgba(217,240,240,0)", 0.15, "rgba(156,207,211,.25)", 0.45, "rgba(91,143,184,.48)", 1, "rgba(91,42,134,.78)"]
     }});
-  map.addLayer({id: "stations", type: "circle", source: "stations", minzoom: 11.5, paint: {
+  ensureLayer(map, {id: "stations", type: "circle", source: "stations", minzoom: 11.5, paint: {
     "circle-radius": ["case", ["get", "selected"], 9, 6],
     "circle-color": ["case", ["==", ["get", "coloring"], "busyness"],
       ["interpolate", ["linear"], ["get", "normalizedBusyness"], 0, StationStyle.BUSYNESS_COLORS.low, 1, StationStyle.BUSYNESS_COLORS.high],
@@ -398,7 +398,7 @@ function addDataLayers() {
     "circle-stroke-color": ["case", ["get", "selected"], "#ed6a00", "#17324d"],
     "circle-stroke-width": ["case", ["get", "selected"], 4, 2]
   }});
-  map.addLayer({id: "insight-stations", type: "circle", source: "stations", minzoom: 0, filter: ["==", ["get", "insight"], true], paint: {
+  ensureLayer(map, {id: "insight-stations", type: "circle", source: "stations", minzoom: 0, filter: ["==", ["get", "insight"], true], paint: {
     "circle-radius": 10, "circle-color": "#fff", "circle-stroke-color": "#ed6a00", "circle-stroke-width": 5
   }});
 }
