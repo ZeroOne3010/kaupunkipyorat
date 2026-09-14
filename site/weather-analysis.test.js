@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {observations, summarize, tooltip} = require("./weather-analysis.js");
+const {observations, summarize, tooltip, trapFocus} = require("./weather-analysis.js");
 
 const history = {daily: [
   {busyness: 100}, {busyness: 200}, {busyness: 300}, {busyness: 400}
@@ -45,4 +45,28 @@ test("tooltip omits missing weather without leaking invalid values", () => {
   assert.match(tooltip(days[0]), /4–12 °C/);
   assert.match(tooltip(days[0]), /0\.0 mm precipitation/);
   assert.equal(tooltip(days[3]).includes("null"), false);
+});
+
+test("focus wraps at both ends of the weather dialog", () => {
+  const first = {hidden: false, getAttribute: () => null, focus() { this.focused = true; }};
+  const last = {hidden: false, getAttribute: () => null, focus() { this.focused = true; }};
+  const panel = {querySelectorAll: () => [first, last], contains: element => element === first || element === last};
+  const forward = {key: "Tab", shiftKey: false, preventDefault() { this.prevented = true; }};
+  assert.equal(trapFocus(panel, forward, last), true);
+  assert.equal(forward.prevented, true);
+  assert.equal(first.focused, true);
+
+  const backward = {key: "Tab", shiftKey: true, preventDefault() { this.prevented = true; }};
+  assert.equal(trapFocus(panel, backward, first), true);
+  assert.equal(backward.prevented, true);
+  assert.equal(last.focused, true);
+});
+
+test("focus trap recovers focus that starts outside the dialog", () => {
+  const first = {hidden: false, getAttribute: () => null, focus() { this.focused = true; }};
+  const panel = {querySelectorAll: () => [first], contains: () => false};
+  const event = {key: "Tab", shiftKey: false, preventDefault() { this.prevented = true; }};
+  assert.equal(trapFocus(panel, event, {}), true);
+  assert.equal(event.prevented, true);
+  assert.equal(first.focused, true);
 });

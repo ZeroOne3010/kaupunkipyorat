@@ -80,7 +80,19 @@
     container.replaceChildren(svg);
   }
 
-  const api = {observations, summarize, tooltip, renderScatter};
+  function trapFocus(panel, event, activeElement = document.activeElement) {
+    if (event.key !== "Tab") return false;
+    const focusable = [...panel.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')]
+      .filter(element => !element.hidden && element.getAttribute("aria-hidden") !== "true");
+    if (!focusable.length) { event.preventDefault(); panel.focus(); return true; }
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (event.shiftKey && activeElement === first) { event.preventDefault(); last.focus(); return true; }
+    if (!event.shiftKey && activeElement === last) { event.preventDefault(); first.focus(); return true; }
+    if (!panel.contains(activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); return true; }
+    return false;
+  }
+
+  const api = {observations, summarize, tooltip, renderScatter, trapFocus};
   root.WeatherAnalysis = api;
   if (typeof module !== "undefined") module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

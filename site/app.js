@@ -17,6 +17,7 @@ const weatherAnalysisCache = new Map();
 const weatherCache = new Map();
 let weatherRequestId = 0;
 let weatherAnalysisRequestId = 0;
+let weatherAnalysisInertState = [];
 let profileWeather = null;
 let profileWeatherContext = null;
 const MAX_FLOW_PARTICLES = 150;
@@ -569,6 +570,8 @@ function hideWeatherAnalysis(restoreFocus = true) {
   const wasOpen = !document.querySelector("#weather-analysis").hidden;
   document.querySelector("#weather-analysis").hidden = true;
   document.querySelector("#weather-analysis-backdrop").hidden = true;
+  weatherAnalysisInertState.forEach(([element, wasInert]) => { element.inert = wasInert; });
+  weatherAnalysisInertState = [];
   weatherAnalysisRequestId++;
   if (restoreFocus && wasOpen && selectedId !== null) document.querySelector("#open-weather-analysis").focus();
 }
@@ -625,6 +628,9 @@ function showWeatherAnalysis() {
   hideStationProfile(false); hideRankings(false); hideInsights();
   document.querySelector("#weather-analysis").hidden = false;
   document.querySelector("#weather-analysis-backdrop").hidden = false;
+  const panel = document.querySelector("#weather-analysis"), backdrop = document.querySelector("#weather-analysis-backdrop");
+  weatherAnalysisInertState = [...document.body.children].filter(element => element !== panel && element !== backdrop).map(element => [element, element.inert]);
+  weatherAnalysisInertState.forEach(([element]) => { element.inert = true; });
   refreshWeatherAnalysis();
   document.querySelector("#close-weather-analysis").focus();
 }
@@ -632,6 +638,7 @@ function showWeatherAnalysis() {
 document.querySelector("#open-weather-analysis").addEventListener("click", showWeatherAnalysis);
 document.querySelector("#close-weather-analysis").addEventListener("click", () => hideWeatherAnalysis());
 document.querySelector("#weather-analysis-backdrop").addEventListener("click", () => hideWeatherAnalysis());
+document.querySelector("#weather-analysis").addEventListener("keydown", event => WeatherAnalysis.trapFocus(event.currentTarget, event));
 document.querySelectorAll('input[name="weather-days"], input[name="weather-metric"]').forEach(input => input.addEventListener("change", refreshWeatherAnalysis));
 document.querySelectorAll("#top-outgoing, #top-incoming").forEach(list => list.addEventListener("click", event => {
   const button = event.target.closest("button[data-station-id]");
