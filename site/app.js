@@ -495,9 +495,10 @@ function showStationProfile() {
   const station = stationById.get(selectedId);
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const isDay = mode === "day";
-  const monthlyStatistics = StationSummary.aggregateStationStatistics(STATIONS, data.total);
-  const stats = StationSummary.summaryFromStatistics(monthlyStatistics.get(selectedId));
-  const rank = 1 + [...monthlyStatistics.values()].filter(item => item.trips > stats.trips).length;
+  const profileTuples = isDay ? data.d[selectedDate.getUTCDate() - 1] || [] : data.total;
+  const profileStatistics = StationSummary.aggregateStationStatistics(STATIONS, profileTuples);
+  const stats = StationSummary.summaryFromStatistics(profileStatistics.get(selectedId));
+  const rank = 1 + [...profileStatistics.values()].filter(item => item.trips > stats.trips).length;
   const directionalTotal = stats.arrivals + stats.departures;
   const arrivalsShare = directionalTotal ? stats.arrivals / directionalTotal * 100 : 0;
   const departuresShare = directionalTotal ? stats.departures / directionalTotal * 100 : 0;
