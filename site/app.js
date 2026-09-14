@@ -13,8 +13,10 @@ const routeRequests = new Map();
 const unavailableRoutes = new Set();
 const decodedRouteCache = new Map();
 const stationProfileCache = new Map();
+const weatherAnalysisCache = new Map();
 const weatherCache = new Map();
 let weatherRequestId = 0;
+let weatherAnalysisRequestId = 0;
 let profileWeather = null;
 let profileWeatherContext = null;
 const MAX_FLOW_PARTICLES = 150;
@@ -313,6 +315,7 @@ function update() {
     renderRanking("#top-incoming", rankedConnections(tuples, false), stationStats.arrivals);
   }
   updateWeatherSummary();
+  if (!document.querySelector("#weather-analysis").hidden) refreshWeatherAnalysis();
 }
 
 async function loadData(dataFile) {
@@ -561,6 +564,75 @@ document.querySelectorAll('input[name="profile-weather"]').forEach(input => inpu
 }));
 document.querySelector("#close-station-profile").addEventListener("click", () => hideStationProfile());
 document.querySelector("#station-profile-backdrop").addEventListener("click", () => hideStationProfile());
+
+function hideWeatherAnalysis(restoreFocus = true) {
+  const wasOpen = !document.querySelector("#weather-analysis").hidden;
+  document.querySelector("#weather-analysis").hidden = true;
+  document.querySelector("#weather-analysis-backdrop").hidden = true;
+  weatherAnalysisRequestId++;
+  if (restoreFocus && wasOpen && selectedId !== null) document.querySelector("#open-weather-analysis").focus();
+}
+
+function renderWeatherAnalysis(summary) {
+  const formatAverage = group => group.average === null ? "Unavailable" : `${Math.round(group.average).toLocaleString()} avg · ${group.count.toLocaleString()} ${group.count === 1 ? "day" : "days"}`;
+  const summaryRows = [
+    ["Dry days", formatAverage(summary.dry)],
+    ["Rainy days", formatAverage(summary.rainy)],
+    ["Difference", summary.difference === null ? "Unavailable" : `${summary.difference > 0 ? "+" : ""}${summary.difference.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}%`]
+  ];
+  document.querySelector("#weather-rain-summary").replaceChildren(...summaryRows.map(([label, value]) => {
+    const row = document.createElement("div"), name = document.createElement("span"), result = document.createElement("strong");
+    name.textContent = label; result.textContent = value; row.append(name, result); return row;
+  }));
+  document.querySelector("#temperature-bands").replaceChildren(...summary.bands.map(band => {
+    const row = document.createElement("div"), label = document.createElement("strong"), value = document.createElement("span");
+    label.textContent = band.label; value.textContent = band.average === null ? "Unavailable" : `${Math.round(band.average).toLocaleString()} avg · ${band.count.toLocaleString()} ${band.count === 1 ? "day" : "days"}`;
+    row.append(label, value); return row;
+  }));
+  const metric = document.querySelector('input[name="weather-metric"]:checked').value;
+  document.querySelector("#weather-scatter-title").textContent = `${metric === "rain" ? "Rain" : "Temperature"} and daily rides`;
+  document.querySelector("#weather-point-details").textContent = "Tap a point to see that day.";
+  WeatherAnalysis.renderScatter(document.querySelector("#weather-scatter"), summary.days, metric);
+}
+
+async function refreshWeatherAnalysis() {
+  const requestId = ++weatherAnalysisRequestId;
+  const content = document.querySelector("#weather-analysis-content"), unavailable = document.querySelector("#weather-analysis-unavailable");
+  if (selectedId === null || !data || !selectedDate) { content.hidden = true; unavailable.hidden = false; return; }
+  const stationId = selectedId, year = selectedDate.getUTCFullYear(), month = selectedDate.getUTCMonth() + 1;
+  const key = `${year}-${String(month).padStart(2, "0")}:${stationId}`;
+  const station = stationById.get(stationId);
+  document.querySelector("#weather-analysis-context").textContent = `${station.name} · ${selectedDate.toLocaleDateString(undefined, {month: "long", year: "numeric", timeZone: "UTC"})}`;
+  let days = weatherAnalysisCache.get(key);
+  if (!days) {
+    const payload = await loadWeather(year);
+    if (requestId !== weatherAnalysisRequestId) return;
+    const historyKey = `${monthKey(selectedDate)}:${stationId}`;
+    if (!stationProfileCache.has(historyKey)) stationProfileCache.set(historyKey, StationProfile.monthlyHistory(stationId, data));
+    const weather = payload && Weather.dailyWeatherForMonth(payload, station.lon, new Date(Date.UTC(year, month - 1, 1)));
+    days = WeatherAnalysis.observations(stationProfileCache.get(historyKey), weather, year, month);
+    if (days) weatherAnalysisCache.set(key, days);
+  }
+  if (requestId !== weatherAnalysisRequestId) return;
+  if (!days) { content.hidden = true; unavailable.hidden = false; return; }
+  unavailable.hidden = true; content.hidden = false;
+  const weekdaysOnly = document.querySelector('input[name="weather-days"]:checked').value === "weekdays";
+  renderWeatherAnalysis(WeatherAnalysis.summarize(days, weekdaysOnly));
+}
+
+function showWeatherAnalysis() {
+  if (selectedId === null || !data || !selectedDate) return;
+  hideStationProfile(false); hideRankings(false); hideInsights();
+  document.querySelector("#weather-analysis").hidden = false;
+  document.querySelector("#weather-analysis-backdrop").hidden = false;
+  refreshWeatherAnalysis();
+  document.querySelector("#close-weather-analysis").focus();
+}
+
+document.querySelector("#open-weather-analysis").addEventListener("click", showWeatherAnalysis);
+document.querySelector("#close-weather-analysis").addEventListener("click", () => hideWeatherAnalysis());
+document.querySelector("#weather-analysis-backdrop").addEventListener("click", () => hideWeatherAnalysis());
+document.querySelectorAll('input[name="weather-days"], input[name="weather-metric"]').forEach(input => input.addEventListener("change", refreshWeatherAnalysis));
 document.querySelectorAll("#top-outgoing, #top-incoming").forEach(list => list.addEventListener("click", event => {
   const button = event.target.closest("button[data-station-id]");
   if (!button) return;
@@ -774,6 +846,7 @@ document.querySelector("#insights-list").addEventListener("click", event => {
   if (ride) visualizeInsight(ride);
 });
 document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !document.querySelector("#weather-analysis").hidden) hideWeatherAnalysis();
   if (event.key === "Escape" && !document.querySelector("#station-profile").hidden) hideStationProfile();
   if (event.key === "Escape" && !document.querySelector("#insights-panel").hidden) hideInsights();
   if (event.key === "Escape" && !document.querySelector("#rankings-panel").hidden) hideRankings();
