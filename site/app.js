@@ -15,7 +15,7 @@ const decodedRouteCache = new Map();
 const stationProfileCache = new Map();
 const weatherAnalysisCache = new Map();
 const weatherAnalysisSummaryCache = new Map();
-const analysisDataCache = new Map();
+const analysisHistoryRequests = new Map();
 const weatherCache = new Map();
 let weatherRequestId = 0;
 let weatherAnalysisRequestId = 0;
@@ -331,19 +331,29 @@ async function loadData(dataFile) {
   const loadedData = await response.json();
   if (requestId !== dataRequestId) return false;
   data = loadedData;
-  if (Number.isInteger(loadedData.y) && Number.isInteger(loadedData.m)) {
-    analysisDataCache.set(`${loadedData.y}-${String(loadedData.m).padStart(2, "0")}`, Promise.resolve(loadedData));
-  }
   return true;
 }
 
-function loadAnalysisData(key) {
-  if (!analysisDataCache.has(key)) {
-    const file = availableMonths.get(key);
-    if (!file) return Promise.resolve(null);
-    analysisDataCache.set(key, fetch(`data/${file}`).then(response => response.ok ? response.json() : null).catch(() => null));
+function loadAnalysisHistory(year, month, stationId) {
+  const monthDataKey = `${year}-${String(month).padStart(2, "0")}`;
+  const historyKey = `${monthDataKey}:${stationId}`;
+  if (stationProfileCache.has(historyKey)) return Promise.resolve(stationProfileCache.get(historyKey));
+  if (data?.y === year && data?.m === month) {
+    const history = StationProfile.monthlyHistory(stationId, data);
+    stationProfileCache.set(historyKey, history);
+    return Promise.resolve(history);
   }
-  return analysisDataCache.get(key);
+  if (analysisHistoryRequests.has(historyKey)) return analysisHistoryRequests.get(historyKey);
+  const file = availableMonths.get(monthDataKey);
+  if (!file) return Promise.resolve(null);
+  const request = fetch(`data/${file}`).then(async response => {
+    if (!response.ok) return null;
+    const history = StationProfile.monthlyHistory(stationId, await response.json());
+    stationProfileCache.set(historyKey, history);
+    return history;
+  }).catch(() => null).finally(() => analysisHistoryRequests.delete(historyKey));
+  analysisHistoryRequests.set(historyKey, request);
+  return request;
 }
 
 async function navigateTime(unit, amount) {
@@ -630,19 +640,20 @@ async function refreshWeatherAnalysis() {
   let days = weatherAnalysisCache.get(key);
   if (!days) {
     loading.hidden = false;
-    const payload = await loadWeather(year);
+    content.hidden = true;
+    unavailable.hidden = true;
+    const weatherRequest = loadWeather(year);
     const months = mode === "season" ? [4, 5, 6, 7, 8, 9, 10] : [month];
-    const monthlyData = await Promise.all(months.map(value => loadAnalysisData(`${year}-${String(value).padStart(2, "0")}`)));
-    if (requestId !== weatherAnalysisRequestId) return;
     days = [];
-    months.forEach((value, index) => {
-      if (!monthlyData[index]) return;
-      const historyKey = `${year}-${String(value).padStart(2, "0")}:${stationId}`;
-      if (!stationProfileCache.has(historyKey)) stationProfileCache.set(historyKey, StationProfile.monthlyHistory(stationId, monthlyData[index]));
+    for (const value of months) {
+      const history = await loadAnalysisHistory(year, value, stationId);
+      if (requestId !== weatherAnalysisRequestId) return;
+      if (!history) { days = null; break; }
+      const payload = await weatherRequest;
       const weather = payload && Weather.dailyWeatherForMonth(payload, station.lon, new Date(Date.UTC(year, value - 1, 1)));
-      const observations = WeatherAnalysis.observations(stationProfileCache.get(historyKey), weather, year, value);
+      const observations = WeatherAnalysis.observations(history, weather, year, value);
       if (observations) days.push(...observations);
-    });
+    }
     if (days) weatherAnalysisCache.set(key, days);
   }
   if (requestId !== weatherAnalysisRequestId) return;

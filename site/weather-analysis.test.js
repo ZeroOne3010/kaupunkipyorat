@@ -77,10 +77,10 @@ test("formats month and season periods", () => {
 });
 
 test("period navigation does not skip unavailable months or years", () => {
-  const months = ["2024-04", "2025-05", "2025-06", "2026-10"];
+  const months = ["2024-04", "2025-05", "2025-06", ...[4, 5, 6, 7, 8, 9, 10].map(month => `2026-${String(month).padStart(2, "0")}`)];
   assert.deepEqual(availablePeriodTarget("month", 2025, 6, -1, months), {year: 2025, month: 5});
   assert.equal(availablePeriodTarget("month", 2025, 6, 1, months), null);
-  assert.deepEqual(availablePeriodTarget("season", 2025, 6, -1, months), {year: 2024, month: 6});
+  assert.equal(availablePeriodTarget("season", 2025, 6, -1, months), null);
   assert.deepEqual(availablePeriodTarget("season", 2025, 6, 1, months), {year: 2026, month: 6});
 });
 

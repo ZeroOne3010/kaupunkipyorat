@@ -32,7 +32,7 @@
         ? {year: target.getUTCFullYear(), month: target.getUTCMonth() + 1} : null;
     }
     const targetYear = year + amount;
-    return [...available].some(key => Number(key.slice(0, 4)) === targetYear && Number(key.slice(5)) >= 4 && Number(key.slice(5)) <= 10)
+    return [4, 5, 6, 7, 8, 9, 10].every(value => available.has(`${targetYear}-${String(value).padStart(2, "0")}`))
       ? {year: targetYear, month} : null;
   }
 
