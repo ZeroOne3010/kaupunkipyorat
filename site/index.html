@@ -66,7 +66,17 @@
       <div><span class="eyebrow">Weather analysis</span><h2 id="weather-analysis-title">Weather &amp; Ridership</h2></div>
       <button id="close-weather-analysis" class="icon-button" type="button" aria-label="Close Weather and Ridership">×</button>
     </header>
+    <p id="weather-analysis-station" class="weather-analysis-station">—</p>
     <p id="weather-analysis-context" class="profile-month">—</p>
+    <div class="weather-period-control" role="group" aria-label="Weather analysis period">
+      <button id="weather-period-previous" type="button">−1M</button>
+      <fieldset class="segments"><legend class="visually-hidden">Period type</legend>
+        <label><input type="radio" name="weather-period" value="month" checked>Month</label>
+        <label><input type="radio" name="weather-period" value="season">Season</label>
+      </fieldset>
+      <button id="weather-period-next" type="button">+1M</button>
+    </div>
+    <p id="weather-analysis-loading" class="weather-analysis-loading" role="status" hidden>Loading period…</p>
     <fieldset class="segments weather-days-control"><legend class="visually-hidden">Days included</legend>
       <label><input type="radio" name="weather-days" value="all" checked>All days</label>
       <label><input type="radio" name="weather-days" value="weekdays">Weekdays only</label>
