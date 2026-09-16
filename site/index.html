@@ -30,6 +30,7 @@
         <div><dt>Round trips</dt><dd id="round-trips">—</dd></div>
       </dl>
       <div id="weather-summary" class="weather-summary" hidden><span class="eyebrow">Weather</span><p id="weather-value"></p></div>
+      <div id="rain-sensitivity-summary" class="weather-summary" hidden><span class="eyebrow">Rain sensitivity</span><p id="rain-sensitivity-value"></p></div>
       <div class="summary-columns">
         <section><h3>Top destinations</h3><p id="unique-destinations" class="unique-count">—</p><ol id="top-outgoing"></ol></section>
         <section><h3>Top origins</h3><p id="unique-origins" class="unique-count">—</p><ol id="top-incoming"></ol></section>
@@ -138,6 +139,7 @@
           <fieldset class="segments color-control"><legend class="visually-hidden">Station coloring</legend>
             <label><input type="radio" name="coloring" value="flow" checked> Net flow</label>
             <label><input type="radio" name="coloring" value="busyness"> Busyness</label>
+            <label><input type="radio" name="coloring" value="weather"> Weather</label>
           </fieldset>
         </div>
         <div class="geometry-row">
@@ -175,6 +177,9 @@
       </div>
       <div id="busyness-legend" class="busyness-legend" aria-label="Station busyness legend" hidden>
         <span>Less busy</span><i aria-hidden="true"></i><span>More busy</span>
+      </div>
+      <div id="weather-sensitivity-legend" class="weather-sensitivity-legend" aria-label="Rain sensitivity legend" hidden>
+        <strong>Rain sensitivity</strong><span>Lower rides in rain</span><i aria-hidden="true"></i><span>0%</span><i aria-hidden="true"></i><span>Higher in rain</span><small id="weather-sensitivity-domain"></small>
       </div>
       <p class="hint">Select a station for its busiest origins and destinations.</p>
       <footer class="app-footer">
@@ -225,6 +230,7 @@
   <script src="weather.js"></script>
   <script src="station-profile.js"></script>
   <script src="weather-analysis.js"></script>
+  <script src="weather-sensitivity.js"></script>
   <script src="monthly-insights.js"></script>
   <script src="route-geometry.js"></script>
   <script src="flow-particles.js"></script>

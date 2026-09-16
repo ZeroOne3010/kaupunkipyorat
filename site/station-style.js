@@ -29,6 +29,7 @@
   };
 
   const BUSYNESS_COLORS = {low: "#d9f0f0", high: "#5b2a86"};
+  const WEATHER_UNAVAILABLE = "#9aa8b2";
 
   function busynessMetric(maxBusyness) {
     return {
@@ -65,7 +66,7 @@
     ];
   }
 
-  const api = {COLORS, BUSYNESS_COLORS, divergingCategory, flowBalanceMetric, busynessMetric, stationProperties, heatmapColor};
+  const api = {COLORS, BUSYNESS_COLORS, WEATHER_UNAVAILABLE, divergingCategory, flowBalanceMetric, busynessMetric, stationProperties, heatmapColor};
   root.StationStyle = api;
   if (typeof module !== "undefined") module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
