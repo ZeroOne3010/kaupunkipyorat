@@ -17,7 +17,6 @@ const weatherAnalysisCache = new Map();
 const weatherAnalysisSummaryCache = new Map();
 const analysisHistoryRequests = new Map();
 const weatherCache = new Map();
-const seasonDataCache = new Map();
 const weatherSensitivityCache = new Map();
 let weatherRequestId = 0;
 let weatherAnalysisRequestId = 0;
@@ -175,22 +174,33 @@ function loadWeather(year) {
   return weatherCache.get(year);
 }
 
-function loadSeasonMonth(year, month) {
+async function loadSensitivityMonth(year, month) {
   const key = `${year}-${String(month).padStart(2, "0")}`;
-  if (data?.y === year && data?.m === month) return Promise.resolve(data);
-  if (!seasonDataCache.has(key)) {
-    const file = availableMonths.get(key);
-    seasonDataCache.set(key, file ? fetch(`data/${file}`).then(response => response.ok ? response.json() : null).catch(() => null) : Promise.resolve(null));
+  if (data?.y === year && data?.m === month) return data;
+  const file = availableMonths.get(key);
+  if (!file) return null;
+  try {
+    const response = await fetch(`data/${file}`);
+    return response.ok ? response.json() : null;
+  } catch (_) {
+    return null;
   }
-  return seasonDataCache.get(key);
 }
 
 async function loadWeatherSensitivity(year) {
   if (weatherSensitivityCache.has(year)) return weatherSensitivityCache.get(year);
-  const request = Promise.all([loadWeather(year), ...WeatherSensitivity.SEASON_MONTHS.map(month => loadSeasonMonth(year, month))]).then(([weather, ...months]) => {
-    if (!weather || months.some(month => !month)) return null;
-    return WeatherSensitivity.calculate(STATIONS, new Map(WeatherSensitivity.SEASON_MONTHS.map((month, index) => [month, months[index]])), weather, year, Weather.cityForLongitude);
-  });
+  const request = (async () => {
+    const weather = await loadWeather(year);
+    if (!weather) return null;
+    const accumulator = WeatherSensitivity.createAccumulator(STATIONS, weather, year, Weather.cityForLongitude);
+    for (const month of WeatherSensitivity.SEASON_MONTHS) {
+      const monthData = await loadSensitivityMonth(year, month);
+      if (!monthData || !accumulator.addMonth(month, monthData)) return null;
+      // Only compact station sums/counts remain referenced when the next large
+      // aggregate is fetched, keeping peak memory suitable for mobile devices.
+    }
+    return accumulator.finish();
+  })();
   weatherSensitivityCache.set(year, request);
   const result = await request;
   if (result) weatherSensitivityCache.set(year, result); else weatherSensitivityCache.delete(year);
@@ -525,7 +535,12 @@ document.addEventListener("themechange", event => {
 
 document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="direction"]').forEach(input => input.addEventListener("change", update));
-document.querySelectorAll('input[name="coloring"]').forEach(input => input.addEventListener("change", () => { update(); prepareWeatherSensitivity(); }));
+document.querySelectorAll('input[name="coloring"]').forEach(input => input.addEventListener("change", () => {
+  const weather = document.querySelector('input[name="coloring"]:checked').value === "weather";
+  if (!weather) document.querySelector("#data-notice").textContent = "";
+  update();
+  if (weather) prepareWeatherSensitivity();
+}));
 document.querySelectorAll('input[name="geometry"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="particles"]').forEach(input => input.addEventListener("change", () => {
   if (particlesEnabled()) update(); else clearParticles();

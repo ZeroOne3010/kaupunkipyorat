@@ -8,11 +8,10 @@
     return sorted[Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * fraction))] || 1;
   }
 
-  function calculate(stations, monthlyData, weather, year, cityForLongitude) {
-    const samples = new Map(stations.map(([id]) => [id, {dry: [], rainy: []}]));
-    for (const month of SEASON_MONTHS) {
-      const payload = monthlyData.get(month);
-      if (!payload?.d) continue;
+  function createAccumulator(stations, weather, year, cityForLongitude) {
+    const samples = new Map(stations.map(([id]) => [id, {dryCount: 0, drySum: 0, rainyCount: 0, rainySum: 0}]));
+    function addMonth(month, payload) {
+      if (!payload?.d) return false;
       payload.d.forEach((tuples, dayIndex) => {
         const rides = new Map(stations.map(([id]) => [id, 0]));
         tuples.forEach(([origin, destination, count]) => {
@@ -23,24 +22,36 @@
         stations.forEach(([id, , , longitude]) => {
           const precipitation = weather?.cities?.[cityForLongitude(longitude)]?.days?.[date]?.d?.[3];
           if (typeof precipitation !== "number" || !Number.isFinite(precipitation)) return;
-          samples.get(id)[precipitation > .5 ? "rainy" : "dry"].push(rides.get(id));
+          const group = precipitation > .5 ? "rainy" : "dry";
+          const sample = samples.get(id);
+          sample[`${group}Count`]++;
+          sample[`${group}Sum`] += rides.get(id);
         });
       });
+      return true;
     }
-    const result = new Map();
-    samples.forEach((groups, id) => {
-      const average = values => values.reduce((sum, value) => sum + value, 0) / values.length;
-      const dryAverage = groups.dry.length ? average(groups.dry) : null;
-      const rainyAverage = groups.rainy.length ? average(groups.rainy) : null;
-      const available = groups.dry.length >= MINIMUM_DAYS && groups.rainy.length >= MINIMUM_DAYS && dryAverage > 0;
-      result.set(id, {available, dryCount: groups.dry.length, rainyCount: groups.rainy.length,
-        dryAverage, rainyAverage, value: available ? (rainyAverage - dryAverage) / dryAverage * 100 : null});
-    });
-    const domain = percentile([...result.values()].filter(value => value.available).map(value => Math.abs(value.value)), .9);
-    result.forEach(value => { value.normalized = value.available ? Math.max(-1, Math.min(1, value.value / domain)) : null; });
-    return {stations: result, domain};
+    function finish() {
+      const result = new Map();
+      samples.forEach((groups, id) => {
+        const dryAverage = groups.dryCount ? groups.drySum / groups.dryCount : null;
+        const rainyAverage = groups.rainyCount ? groups.rainySum / groups.rainyCount : null;
+        const available = groups.dryCount >= MINIMUM_DAYS && groups.rainyCount >= MINIMUM_DAYS && dryAverage > 0;
+        result.set(id, {available, dryCount: groups.dryCount, rainyCount: groups.rainyCount,
+          dryAverage, rainyAverage, value: available ? (rainyAverage - dryAverage) / dryAverage * 100 : null});
+      });
+      const domain = percentile([...result.values()].filter(value => value.available).map(value => Math.abs(value.value)), .9);
+      result.forEach(value => { value.normalized = value.available ? Math.max(-1, Math.min(1, value.value / domain)) : null; });
+      return {stations: result, domain};
+    }
+    return {addMonth, finish};
   }
 
-  root.WeatherSensitivity = {SEASON_MONTHS, MINIMUM_DAYS, calculate, percentile};
+  function calculate(stations, monthlyData, weather, year, cityForLongitude) {
+    const accumulator = createAccumulator(stations, weather, year, cityForLongitude);
+    SEASON_MONTHS.forEach(month => accumulator.addMonth(month, monthlyData.get(month)));
+    return accumulator.finish();
+  }
+
+  root.WeatherSensitivity = {SEASON_MONTHS, MINIMUM_DAYS, createAccumulator, calculate, percentile};
   if (typeof module !== "undefined") module.exports = root.WeatherSensitivity;
 })(typeof globalThis !== "undefined" ? globalThis : this);

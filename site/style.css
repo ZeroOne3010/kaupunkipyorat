@@ -144,6 +144,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 [data-theme="dark"] .summary .empty,
 [data-theme="dark"] .balance-legend,
 [data-theme="dark"] .busyness-legend,
+[data-theme="dark"] .weather-sensitivity-legend,
 [data-theme="dark"] .rankings-period,
 [data-theme="dark"] .ranking-row button::before,
 [data-theme="dark"] .ranking-value,
