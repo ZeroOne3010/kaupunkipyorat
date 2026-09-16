@@ -17,6 +17,8 @@ const weatherAnalysisCache = new Map();
 const weatherAnalysisSummaryCache = new Map();
 const analysisHistoryRequests = new Map();
 const weatherCache = new Map();
+const seasonDataCache = new Map();
+const weatherSensitivityCache = new Map();
 let weatherRequestId = 0;
 let weatherAnalysisRequestId = 0;
 let weatherAnalysisInertState = [];
@@ -55,6 +57,7 @@ function stationGeoJSON(tuples = [], statistics = null) {
   const coloring = document.querySelector('input[name="coloring"]:checked').value;
   const maxBusyness = Math.max(0, ...[...balances.values()].map(StationBalance.stationBusyness));
   const metric = coloring === "busyness" ? StationStyle.busynessMetric(maxBusyness) : StationStyle.flowBalanceMetric;
+  const sensitivity = selectedDate && weatherSensitivityCache.get(selectedDate.getUTCFullYear());
   return {type: "FeatureCollection", features: STATIONS.map(([id, name, lat, lon]) => ({
     type: "Feature", properties: {
       id,
@@ -62,9 +65,15 @@ function stationGeoJSON(tuples = [], statistics = null) {
       selected: id === selectedId,
       insight: insightRide && (id === insightRide.origin || id === insightRide.destination),
       coloring,
-      ...StationStyle.stationProperties(metric, balances.get(id))
+      ...(coloring === "weather" ? weatherSensitivityProperties(sensitivity?.stations.get(id)) : StationStyle.stationProperties(metric, balances.get(id)))
     }, geometry: {type: "Point", coordinates: [lon, lat]}
   }))};
+}
+
+function weatherSensitivityProperties(value) {
+  if (!value?.available) return {colorCategory: "unavailable", colorWeight: 0, weatherAvailable: false};
+  return {colorCategory: StationStyle.divergingCategory(value.normalized, [.15, .45, .75]), colorWeight: Math.abs(value.normalized),
+    weatherAvailable: true, weatherSensitivity: value.value, normalizedSensitivity: value.normalized};
 }
 
 function currentTuples() {
@@ -164,6 +173,38 @@ function loadWeather(year) {
     }).catch(() => null));
   }
   return weatherCache.get(year);
+}
+
+function loadSeasonMonth(year, month) {
+  const key = `${year}-${String(month).padStart(2, "0")}`;
+  if (data?.y === year && data?.m === month) return Promise.resolve(data);
+  if (!seasonDataCache.has(key)) {
+    const file = availableMonths.get(key);
+    seasonDataCache.set(key, file ? fetch(`data/${file}`).then(response => response.ok ? response.json() : null).catch(() => null) : Promise.resolve(null));
+  }
+  return seasonDataCache.get(key);
+}
+
+async function loadWeatherSensitivity(year) {
+  if (weatherSensitivityCache.has(year)) return weatherSensitivityCache.get(year);
+  const request = Promise.all([loadWeather(year), ...WeatherSensitivity.SEASON_MONTHS.map(month => loadSeasonMonth(year, month))]).then(([weather, ...months]) => {
+    if (!weather || months.some(month => !month)) return null;
+    return WeatherSensitivity.calculate(STATIONS, new Map(WeatherSensitivity.SEASON_MONTHS.map((month, index) => [month, months[index]])), weather, year, Weather.cityForLongitude);
+  });
+  weatherSensitivityCache.set(year, request);
+  const result = await request;
+  if (result) weatherSensitivityCache.set(year, result); else weatherSensitivityCache.delete(year);
+  return result;
+}
+
+async function prepareWeatherSensitivity() {
+  if (!selectedDate || document.querySelector('input[name="coloring"]:checked').value !== "weather") return;
+  const year = selectedDate.getUTCFullYear();
+  document.querySelector("#data-notice").textContent = "Calculating season rain sensitivity…";
+  const result = await loadWeatherSensitivity(year);
+  if (!selectedDate || selectedDate.getUTCFullYear() !== year || document.querySelector('input[name="coloring"]:checked').value !== "weather") return;
+  document.querySelector("#data-notice").textContent = result ? "" : "Rain sensitivity is unavailable for this season.";
+  update();
 }
 
 async function updateWeatherSummary() {
@@ -270,10 +311,13 @@ function update() {
   const coloring = document.querySelector('input[name="coloring"]:checked').value;
   document.querySelector("#balance-legend").hidden = coloring !== "flow";
   document.querySelector("#busyness-legend").hidden = coloring !== "busyness";
+  document.querySelector("#weather-sensitivity-legend").hidden = coloring !== "weather";
+  const sensitivity = weatherSensitivityCache.get(selectedDate.getUTCFullYear());
+  if (coloring === "weather" && sensitivity?.domain) document.querySelector("#weather-sensitivity-domain").textContent = `Scale clipped at ±${Math.round(sensitivity.domain)}%; exact values shown in Station Summary.`;
   if (map.getLayer("station-heat-busyness")) {
     map.setLayoutProperty("station-heat-busyness", "visibility", coloring === "busyness" ? "visible" : "none");
     ["neutral", "negative-low", "positive-low", "negative", "positive", "negative-strong", "positive-strong"].forEach(category => {
-      map.setLayoutProperty(`station-heat-${category}`, "visibility", coloring === "flow" ? "visible" : "none");
+      map.setLayoutProperty(`station-heat-${category}`, "visibility", coloring === "flow" || coloring === "weather" ? "visible" : "none");
     });
   }
   let shown = tuples.filter(([origin, destination, count]) => {
@@ -318,6 +362,14 @@ function update() {
     document.querySelector("#unique-origins").textContent = `${stationStats.uniqueOrigins.toLocaleString()} unique`;
     renderRanking("#top-outgoing", rankedConnections(tuples, true), stationStats.departures);
     renderRanking("#top-incoming", rankedConnections(tuples, false), stationStats.arrivals);
+    const rainSection = document.querySelector("#rain-sensitivity-summary");
+    rainSection.hidden = coloring !== "weather";
+    if (coloring === "weather") {
+      const value = sensitivity?.stations?.get(selectedId);
+      document.querySelector("#rain-sensitivity-value").textContent = value?.available
+        ? `${value.value > 0 ? "+" : ""}${value.value.toLocaleString(undefined, {maximumFractionDigits: 1})}% · ${value.dryCount} dry / ${value.rainyCount} rainy days · Dry avg ${Math.round(value.dryAverage)} · Rainy avg ${Math.round(value.rainyAverage)}`
+        : `Unavailable${value ? ` · ${value.dryCount} dry / ${value.rainyCount} rainy days` : " while season data loads"}`;
+    }
   }
   updateWeatherSummary();
   if (!document.querySelector("#weather-analysis").hidden) refreshWeatherAnalysis();
@@ -371,6 +423,7 @@ async function navigateTime(unit, amount) {
     closeInsightVisualization();
     prepareInsights();
     update();
+    prepareWeatherSensitivity();
   } catch (error) {
     selectedDate = previousDate;
     notice.textContent = "Data is unavailable for that month.";
@@ -422,7 +475,9 @@ function addDataLayers() {
     "circle-radius": ["case", ["get", "selected"], 9, 6],
     "circle-color": ["case", ["==", ["get", "coloring"], "busyness"],
       ["interpolate", ["linear"], ["get", "normalizedBusyness"], 0, StationStyle.BUSYNESS_COLORS.low, 1, StationStyle.BUSYNESS_COLORS.high],
-      ["match", ["get", "colorCategory"], ...Object.entries(StationStyle.COLORS).flat(), StationStyle.COLORS.neutral]],
+      ["case", ["==", ["get", "coloring"], "weather"],
+        ["case", ["get", "weatherAvailable"], ["interpolate", ["linear"], ["get", "normalizedSensitivity"], -1, StationStyle.COLORS["negative-strong"], 0, StationStyle.COLORS.neutral, 1, StationStyle.COLORS["positive-strong"]], StationStyle.WEATHER_UNAVAILABLE],
+        ["match", ["get", "colorCategory"], ...Object.entries(StationStyle.COLORS).flat(), StationStyle.COLORS.neutral]]],
     "circle-opacity": ["interpolate", ["linear"], ["zoom"], 11.5, 0, 12, 1],
     "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 11.5, 0, 12, 1],
     "circle-stroke-color": ["case", ["get", "selected"], "#ed6a00", "#17324d"],
@@ -470,7 +525,7 @@ document.addEventListener("themechange", event => {
 
 document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="direction"]').forEach(input => input.addEventListener("change", update));
-document.querySelectorAll('input[name="coloring"]').forEach(input => input.addEventListener("change", update));
+document.querySelectorAll('input[name="coloring"]').forEach(input => input.addEventListener("change", () => { update(); prepareWeatherSensitivity(); }));
 document.querySelectorAll('input[name="geometry"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="particles"]').forEach(input => input.addEventListener("change", () => {
   if (particlesEnabled()) update(); else clearParticles();
@@ -709,9 +764,10 @@ function showWeatherAnalysis() {
   const panel = document.querySelector("#weather-analysis"), backdrop = document.querySelector("#weather-analysis-backdrop");
   weatherAnalysisInertState = [...document.body.children].filter(element => element !== panel && element !== backdrop).map(element => [element, element.inert]);
   weatherAnalysisInertState.forEach(([element]) => { element.inert = true; });
-  weatherAnalysisPeriod = {mode: "month", year: selectedDate.getUTCFullYear(), month: selectedDate.getUTCMonth() + 1};
+  const fromSensitivity = document.querySelector('input[name="coloring"]:checked').value === "weather";
+  weatherAnalysisPeriod = {mode: fromSensitivity ? "season" : "month", year: selectedDate.getUTCFullYear(), month: selectedDate.getUTCMonth() + 1};
   weatherAnalysisRememberedMonths.set(weatherAnalysisPeriod.year, weatherAnalysisPeriod.month);
-  document.querySelector('input[name="weather-period"][value="month"]').checked = true;
+  document.querySelector(`input[name="weather-period"][value="${weatherAnalysisPeriod.mode}"]`).checked = true;
   refreshWeatherAnalysis();
   document.querySelector("#close-weather-analysis").focus();
 }

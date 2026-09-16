@@ -51,7 +51,7 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .filter-row { display: flex; align-items: center; gap: 9px; }
 .direction-control { flex: 1 1 auto; }
 .color-row, .geometry-row, .particles-row { display: flex; align-items: center; gap: 9px; color: #526a7e; font-size: 12px; font-weight: 700; }
-.color-control { width: 190px; }
+.color-control { width: min(100%, 290px); }
 .color-control label, .geometry-control label { padding-block: 5px; }
 .geometry-control { width: 160px; }
 .info-popup { position: relative; margin-left: -3px; }
@@ -97,6 +97,11 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .ride-details dd { margin: 0; font-weight: 700; }
 .weather-summary { margin: -3px 0 12px; padding-bottom: 9px; border-bottom: 1px solid #d9e1e7; }
 .weather-summary p { margin: 2px 0 0; font-weight: 700; }
+.weather-sensitivity-legend { display: grid; grid-template-columns: auto auto 42px auto 42px auto; gap: 5px; align-items: center; color: #526a7e; font-size: 10px; }
+.weather-sensitivity-legend strong { grid-column: 1 / -1; }
+.weather-sensitivity-legend i { height: 7px; background: linear-gradient(90deg, #c7384f, #f5f3ed); border-radius: 4px; }
+.weather-sensitivity-legend i:nth-of-type(2) { background: linear-gradient(90deg, #f5f3ed, #087f5b); }
+.weather-sensitivity-legend small { grid-column: 1 / -1; }
 .wind-arrow { display: inline-block; transform-origin: center; }
 .summary-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .summary h3 { margin: 0; font-size: 12px; }
