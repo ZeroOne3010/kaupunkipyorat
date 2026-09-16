@@ -7,6 +7,17 @@
     return {domain: payload.domain, stations};
   }
 
-  root.WeatherSensitivity = {parse};
+  function rankings(stations) {
+    const available = [...(stations || new Map()).entries()]
+      .filter(([, station]) => station?.available && Number.isFinite(station.value))
+      .map(([id, station]) => ({...station, id}));
+    const byMagnitude = (a, b) => Math.abs(b.value) - Math.abs(a.value) || a.id - b.id;
+    return {
+      most: [...available].sort(byMagnitude),
+      least: [...available].sort((a, b) => Math.abs(a.value) - Math.abs(b.value) || a.id - b.id)
+    };
+  }
+
+  root.WeatherSensitivity = {parse, rankings};
   if (typeof module !== "undefined") module.exports = root.WeatherSensitivity;
 })(typeof globalThis !== "undefined" ? globalThis : this);

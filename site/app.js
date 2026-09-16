@@ -35,6 +35,7 @@ const particleFeatureCollection = {type: "FeatureCollection", features: []};
 let statisticsTupleReference = null;
 let periodStatistics = null;
 let periodRankings = null;
+let rankingsRenderId = 0;
 const {availableMonthTarget, monthKey, shiftedDate} = TimeNavigation;
 const MAP_STYLES = {
   light: "https://tiles.openfreemap.org/styles/bright",
@@ -800,15 +801,34 @@ const rankingLabels = {
   distance: stats => `${(stats.averageDistanceMeters / 1000).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} km avg`,
   duration: stats => stats.averageDurationSeconds < 600
     ? `${(stats.averageDurationSeconds / 60).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} min avg`
-    : `${Math.round(stats.averageDurationSeconds / 60).toLocaleString()} min avg`
+    : `${Math.round(stats.averageDurationSeconds / 60).toLocaleString()} min avg`,
+  weatherMost: stats => `${stats.value > 0 ? "+" : ""}${stats.value.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}% in rain`,
+  weatherLeast: stats => rankingLabels.weatherMost(stats)
 };
 
-function renderStationRankings() {
+async function renderStationRankings() {
+  const renderId = ++rankingsRenderId;
   currentStatistics();
   const type = document.querySelector("#ranking-type").value;
-  const rows = periodRankings[type].slice(0, 15);
-  document.querySelector("#rankings-period").textContent = periodText();
-  document.querySelector("#rankings-empty").hidden = rows.length > 0;
+  const weatherRanking = type === "weatherMost" || type === "weatherLeast";
+  const empty = document.querySelector("#rankings-empty");
+  let rows;
+  if (weatherRanking) {
+    const year = selectedDate.getUTCFullYear();
+    document.querySelector("#rankings-period").textContent = `${year} bike season (April–October)`;
+    document.querySelector("#rankings-list").replaceChildren();
+    empty.textContent = "Loading weather sensitivity…";
+    empty.hidden = false;
+    const sensitivity = await loadWeatherSensitivity(year);
+    if (renderId !== rankingsRenderId || year !== selectedDate?.getUTCFullYear() || type !== document.querySelector("#ranking-type").value) return;
+    rows = WeatherSensitivity.rankings(sensitivity?.stations)[type === "weatherMost" ? "most" : "least"].slice(0, 15);
+    empty.textContent = "Weather sensitivity is unavailable for this season.";
+  } else {
+    rows = periodRankings[type].slice(0, 15);
+    document.querySelector("#rankings-period").textContent = periodText();
+    empty.textContent = "Not enough activity for this ranking in the selected period.";
+  }
+  empty.hidden = rows.length > 0;
   document.querySelector("#rankings-list").replaceChildren(...rows.map(stats => {
     const item = document.createElement("li");
     item.className = `ranking-row${stats.id === selectedId ? " selected" : ""}`;

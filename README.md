@@ -150,6 +150,11 @@ precipitation) with rainy days. A group needs at least ten days, and the map col
 scale is clipped at the 90th percentile of the available stations' absolute
 percentage changes.
 
+Station Rankings can also list the 15 most and least weather-sensitive stations
+for the selected year's complete bike season. Sensitivity is ranked by the
+absolute percentage change, while the displayed signed value shows whether rain
+is associated with more or fewer rides.
+
 The builder can also be run locally (it requires network access):
 
 ```sh
