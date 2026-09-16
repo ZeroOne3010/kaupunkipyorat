@@ -16,3 +16,18 @@ test("rejects mismatched and malformed payloads", () => {
   assert.equal(WeatherSensitivity.parse({v: 1, year: 2024, domain: 1, stations: {}}, 2025), null);
   assert.equal(WeatherSensitivity.parse({v: 2, year: 2025, domain: 1, stations: {}}, 2025), null);
 });
+
+test("ranks available stations by the magnitude of their weather sensitivity", () => {
+  const stations = new Map([
+    [1, {value: -20, available: true}],
+    [2, {value: 5, available: true}],
+    [3, {value: 0, available: true}],
+    [4, {value: null, available: false}],
+    [5, {value: 20, available: true}]
+  ]);
+
+  const result = WeatherSensitivity.rankings(stations);
+
+  assert.deepEqual(result.most.map(station => station.id), [1, 5, 2, 3]);
+  assert.deepEqual(result.least.map(station => station.id), [3, 2, 1, 5]);
+});
