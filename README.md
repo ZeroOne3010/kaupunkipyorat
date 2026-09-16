@@ -131,6 +131,25 @@ only when it is needed and shows weather in Station Summary. A station longitude
 below `24.8474184` uses Espoo weather; every other station uses Helsinki weather.
 Missing weather files or measurements do not affect trip visualization.
 
+Rain sensitivity is precalculated per station rather than derived in the browser.
+After committing a complete April–October set of monthly aggregates and its
+weather file, run **Actions → Build weather sensitivity → Run workflow** for that
+year. Download the artifact and copy its `YYYY.json` into
+`site/weather-sensitivity/`, then commit it. The static site loads this small
+sidecar directly when the rain-sensitivity coloring is selected; it does not
+download and scan the seven large monthly aggregate files.
+
+The same sidecar can be generated locally without network access:
+
+```sh
+python preprocess/build-weather-sensitivity.py 2025 site/weather-sensitivity/2025.json
+```
+
+Each station compares its mean daily rides on dry days (at most 0.5 mm of
+precipitation) with rainy days. A group needs at least ten days, and the map color
+scale is clipped at the 90th percentile of the available stations' absolute
+percentage changes.
+
 The builder can also be run locally (it requires network access):
 
 ```sh

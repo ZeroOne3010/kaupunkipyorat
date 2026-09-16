@@ -1,0 +1,41 @@
+name: Build weather sensitivity
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: Complete city-bike season year
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sensitivity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate year
+        env:
+          YEAR: ${{ inputs.year }}
+        run: |
+          [[ "$YEAR" =~ ^[0-9]{4}$ ]] || { echo "year must contain four digits" >&2; exit 1; }
+      - name: Build per-station rain sensitivity
+        env:
+          YEAR: ${{ inputs.year }}
+        run: python preprocess/build-weather-sensitivity.py "$YEAR" "output/$YEAR.json"
+      - name: Validate output
+        env:
+          YEAR: ${{ inputs.year }}
+        run: |
+          python -m json.tool "output/$YEAR.json" >/dev/null
+          test "$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["year"])' "output/$YEAR.json")" = "$YEAR"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weather-sensitivity-${{ inputs.year }}
+          path: output/${{ inputs.year }}.json
+          if-no-files-found: error
