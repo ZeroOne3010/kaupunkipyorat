@@ -174,33 +174,11 @@ function loadWeather(year) {
   return weatherCache.get(year);
 }
 
-async function loadSensitivityMonth(year, month) {
-  const key = `${year}-${String(month).padStart(2, "0")}`;
-  if (data?.y === year && data?.m === month) return data;
-  const file = availableMonths.get(key);
-  if (!file) return null;
-  try {
-    const response = await fetch(`data/${file}`);
-    return response.ok ? response.json() : null;
-  } catch (_) {
-    return null;
-  }
-}
-
 async function loadWeatherSensitivity(year) {
   if (weatherSensitivityCache.has(year)) return weatherSensitivityCache.get(year);
-  const request = (async () => {
-    const weather = await loadWeather(year);
-    if (!weather) return null;
-    const accumulator = WeatherSensitivity.createAccumulator(STATIONS, weather, year, Weather.cityForLongitude);
-    for (const month of WeatherSensitivity.SEASON_MONTHS) {
-      const monthData = await loadSensitivityMonth(year, month);
-      if (!monthData || !accumulator.addMonth(month, monthData)) return null;
-      // Only compact station sums/counts remain referenced when the next large
-      // aggregate is fetched, keeping peak memory suitable for mobile devices.
-    }
-    return accumulator.finish();
-  })();
+  const request = fetch(`weather-sensitivity/${year}.json`)
+    .then(async response => response.ok ? WeatherSensitivity.parse(await response.json(), year) : null)
+    .catch(() => null);
   weatherSensitivityCache.set(year, request);
   const result = await request;
   if (result) weatherSensitivityCache.set(year, result); else weatherSensitivityCache.delete(year);
@@ -210,7 +188,7 @@ async function loadWeatherSensitivity(year) {
 async function prepareWeatherSensitivity() {
   if (!selectedDate || document.querySelector('input[name="coloring"]:checked').value !== "weather") return;
   const year = selectedDate.getUTCFullYear();
-  document.querySelector("#data-notice").textContent = "Calculating season rain sensitivity…";
+  document.querySelector("#data-notice").textContent = "Loading season rain sensitivity…";
   const result = await loadWeatherSensitivity(year);
   if (!selectedDate || selectedDate.getUTCFullYear() !== year || document.querySelector('input[name="coloring"]:checked').value !== "weather") return;
   document.querySelector("#data-notice").textContent = result ? "" : "Rain sensitivity is unavailable for this season.";
