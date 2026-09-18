@@ -42,6 +42,7 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .segments label:has(input:checked) { background: #17324d; color: #fff; }
 .segments input { position: absolute; opacity: 0; }
 .segments label:has(input:focus-visible) { outline: 2px solid #1683cf; outline-offset: 2px; z-index: 1; }
+.segments:disabled label { cursor: default; opacity: .45; }
 .mode-control { width: min(270px, 100%); }
 .period-label { margin: 0; font-size: 17px; font-weight: 750; }
 .time-navigation { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 6px repeat(3, minmax(0, 1fr)); gap: 4px; }
@@ -53,7 +54,7 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .color-row, .geometry-row, .particles-row { display: flex; align-items: center; gap: 9px; color: #526a7e; font-size: 12px; font-weight: 700; }
 .color-control { width: min(100%, 290px); }
 .color-control label, .geometry-control label { padding-block: 5px; }
-.geometry-control { width: 160px; }
+.geometry-control { width: 210px; }
 .info-popup { position: relative; margin-left: -3px; }
 .info-popup summary { display: grid; width: 22px; height: 22px; box-sizing: border-box; place-items: center; border: 1px solid #8295a5; border-radius: 50%; background: #fff; color: #526a7e; font: 800 13px/1 Georgia, serif; cursor: pointer; list-style: none; }
 .info-popup summary::-webkit-details-marker { display: none; }

@@ -145,6 +145,7 @@
         <div class="geometry-row">
           <span>Connections</span>
           <fieldset class="segments geometry-control"><legend class="visually-hidden">Connection geometry</legend>
+            <label><input type="radio" name="geometry" value="off"> Off</label>
             <label><input type="radio" name="geometry" value="straight" checked> Straight</label>
             <label><input type="radio" name="geometry" value="routes"> Routes</label>
           </fieldset>
@@ -158,7 +159,7 @@
         </div>
         <div class="particles-row">
           <span>Particles</span>
-          <fieldset class="segments particles-control"><legend class="visually-hidden">Animated flow particles</legend>
+          <fieldset class="segments particles-control" id="particles-control"><legend class="visually-hidden">Animated flow particles</legend>
             <label><input type="radio" name="particles" value="off" checked> Off</label>
             <label><input type="radio" name="particles" value="on"> On</label>
           </fieldset>
