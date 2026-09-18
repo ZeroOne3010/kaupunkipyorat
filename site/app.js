@@ -230,8 +230,16 @@ function routedGeometryEnabled() {
   return document.querySelector('input[name="geometry"]:checked').value === "routes";
 }
 
+function connectionsEnabled() {
+  return document.querySelector('input[name="geometry"]:checked').value !== "off";
+}
+
 function particlesEnabled() {
-  return document.querySelector('input[name="particles"]:checked').value === "on";
+  return connectionsEnabled() && document.querySelector('input[name="particles"]:checked').value === "on";
+}
+
+function updateParticleControl() {
+  document.querySelector("#particles-control").disabled = !connectionsEnabled();
 }
 
 function clearParticles() {
@@ -325,7 +333,7 @@ function update() {
       geometry: {type: "LineString", coordinates}
     };
   }).filter(Boolean);
-  map.getSource("flows").setData({type: "FeatureCollection", features});
+  map.getSource("flows").setData({type: "FeatureCollection", features: connectionsEnabled() ? features : []});
   rebuildParticles(features);
   loadSelectedRoutes();
   map.getSource("stations").setData(stationGeoJSON(tuples, statistics));
@@ -520,10 +528,14 @@ document.querySelectorAll('input[name="coloring"]').forEach(input => input.addEv
   update();
   if (weather) prepareWeatherSensitivity();
 }));
-document.querySelectorAll('input[name="geometry"]').forEach(input => input.addEventListener("change", update));
+document.querySelectorAll('input[name="geometry"]').forEach(input => input.addEventListener("change", () => {
+  updateParticleControl();
+  update();
+}));
 document.querySelectorAll('input[name="particles"]').forEach(input => input.addEventListener("change", () => {
   if (particlesEnabled()) update(); else clearParticles();
 }));
+updateParticleControl();
 map.on("movestart", () => { particleInteractionPaused = true; particleLastTime = null; });
 map.on("moveend", () => { particleInteractionPaused = false; particleLastTime = null; });
 document.addEventListener("visibilitychange", () => {
