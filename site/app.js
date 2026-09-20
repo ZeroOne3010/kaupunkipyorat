@@ -311,12 +311,7 @@ function update() {
   document.querySelector("#weather-sensitivity-legend").hidden = coloring !== "weather";
   const sensitivity = weatherSensitivityCache.get(selectedDate.getUTCFullYear());
   if (coloring === "weather" && sensitivity?.domain) document.querySelector("#weather-sensitivity-domain").textContent = `Scale clipped at ±${Math.round(sensitivity.domain)}%; exact values shown in Station Summary.`;
-  if (map.getLayer("station-heat-busyness")) {
-    map.setLayoutProperty("station-heat-busyness", "visibility", coloring === "busyness" ? "visible" : "none");
-    ["neutral", "negative-low", "positive-low", "negative", "positive", "negative-strong", "positive-strong"].forEach(category => {
-      map.setLayoutProperty(`station-heat-${category}`, "visibility", coloring === "flow" || coloring === "weather" ? "visible" : "none");
-    });
-  }
+  MapLayerUtils.setStationHeatmapVisibility(map, coloring, selectedId !== null);
   let shown = tuples.filter(([origin, destination, count]) => {
     if (count < minimumRideCount()) return false;
     if (selectedId === null) return true;
