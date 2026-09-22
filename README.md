@@ -116,6 +116,61 @@ DIGITRANSIT_SUBSCRIPTION_KEY=... \
   python preprocess/build-routes.py --start-station-index 0 --max-stations 1 --delay-ms 750
 ```
 
+## Estimated cycling corridors
+
+With no station selected, **Connections → Routes** displays a season-wide
+estimate of the cycling corridors used by city-bike trips. This is an inference:
+each directed station-to-station trip count is assigned to its precalculated
+Digitransit shortest bicycle route. It is **not recorded GPS data**, and must not
+be interpreted as the paths riders actually chose. A season is April through
+October. Month, day, and hour navigation continues to show the selected year's
+same full-season corridor layer, labelled `Apr–Oct YYYY`.
+
+All expensive processing is offline. The browser fetches and caches only
+`site/corridors/YYYY.json`; it never combines the individual route files. Build a
+season locally with Python 3 plus [Shapely](https://shapely.readthedocs.io/) and
+[pyproj](https://pyproj4.github.io/pyproj/):
+
+```sh
+python -m pip install shapely pyproj
+python preprocess/build-corridors.py 2025 --tolerance-meters 4 \
+  --output site/corridors/2025.json
+```
+
+The command requires all seven `site/data/YYYY-04.json` through
+`site/data/YYYY-10.json` files and uses only committed data and
+`site/routes/<originStationId>.json`; it makes no network requests. Missing
+directed routes are reported and skipped rather than replaced by straight lines.
+The manual **Build estimated cycling corridors** workflow exposes year,
+conflation tolerance, and minimum-trip inputs, validates the result, and uploads
+the JSON and diagnostic report as an artifact. It never commits or pushes files.
+
+The compact, non-GeoJSON schema is:
+
+```json
+{"v":1,"year":2025,"from":"2025-04","to":"2025-10","toleranceMeters":4,"corridors":[["encodedGooglePolyline",18420]]}
+```
+
+Each tuple contains an encoded Google polyline and its exact estimated seasonal
+trip count. Route curves and original vertices are retained. In EPSG:3067,
+buffer-overlap boundaries split each route where its set of nearby routes
+changes; reversed lines and lines with different vertex spacing can therefore
+share a corridor without a resampling grid. The default four-metre tolerance is
+a geometric conflation allowance. Nearby pieces must also cover one another
+along their length with local headings within 30 degrees, so perpendicular
+crossings are not treated as shared corridors. A representative suppresses a
+duplicate only when both pieces have the same complete route-membership set;
+this preserves demand where proximity is non-transitive. Adjacent equal-weight
+pieces are merged only through unambiguous line continuations.
+
+Known limitations are inherent to route inference and conflation: Digitransit's
+shortest route need not be a rider's chosen route; routing data can change over
+time; missing routes reduce represented demand; and lines closer than the chosen
+tolerance can be conflated even when they are distinct facilities. Conversely,
+larger offsets can keep two representations of the same physical corridor
+separate. Corridor totals describe inferred route usage, not measured counts at
+a location.
+
 ## Historical weather
 
 Run **Actions → Build historical weather → Run workflow** with one city-bike year

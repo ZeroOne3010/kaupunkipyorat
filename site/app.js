@@ -12,6 +12,8 @@ const routeCache = new Map();
 const routeRequests = new Map();
 const unavailableRoutes = new Set();
 const decodedRouteCache = new Map();
+const corridorCache = new Map();
+const corridorRequests = new Map();
 const stationProfileCache = new Map();
 const weatherAnalysisCache = new Map();
 const weatherAnalysisSummaryCache = new Map();
@@ -49,6 +51,7 @@ const map = new maplibregl.Map({
   attributionControl: false,
   style: MAP_STYLES[document.documentElement.dataset.theme] || MAP_STYLES.light
 });
+const corridorPopup = new maplibregl.Popup({closeButton: false, closeOnClick: false, offset: 8});
 map.addControl(new maplibregl.NavigationControl(), "top-right");
 map.addControl(new maplibregl.AttributionControl({compact: true}), "top-right");
 
@@ -298,6 +301,43 @@ async function loadSelectedRoutes() {
   if (routeCache.has(stationId) && selectedId === stationId && routedGeometryEnabled()) update();
 }
 
+async function loadCorridors(year) {
+  if (corridorCache.has(year)) return corridorCache.get(year);
+  if (!corridorRequests.has(year)) {
+    corridorRequests.set(year, fetch(`corridors/${year}.json`).then(async response => {
+      if (!response.ok) return null;
+      return CorridorGeometry.parse(await response.json(), year, RouteGeometry.decodePolyline);
+    }).catch(() => null).finally(() => corridorRequests.delete(year)));
+  }
+  const result = await corridorRequests.get(year);
+  corridorCache.set(year, result);
+  if (selectedId === null && routedGeometryEnabled() && selectedDate?.getUTCFullYear() === year) update();
+  return result;
+}
+
+function updateCorridors() {
+  const source = map.getSource("corridors");
+  if (!source) return false;
+  const active = selectedId === null && routedGeometryEnabled();
+  const explanation = document.querySelector("#corridor-explanation");
+  explanation.hidden = !active;
+  if (!active) {
+    source.setData({type: "FeatureCollection", features: []});
+    return false;
+  }
+  const year = selectedDate.getUTCFullYear();
+  document.querySelector("#corridor-label").textContent = `Estimated cycling corridors · ${CorridorGeometry.periodLabel(year)}`;
+  const corridors = corridorCache.get(year);
+  source.setData(corridors?.geojson || {type: "FeatureCollection", features: []});
+  if (corridors === undefined) {
+    document.querySelector("#data-notice").textContent = `Loading estimated cycling corridors for ${CorridorGeometry.periodLabel(year)}…`;
+    loadCorridors(year);
+  } else {
+    document.querySelector("#data-notice").textContent = corridors ? "" : `Estimated cycling corridors are unavailable for ${CorridorGeometry.periodLabel(year)}.`;
+  }
+  return Boolean(corridors);
+}
+
 function update() {
   if (!data || !selectedDate || !map.getSource("flows")) return;
   updateTimeDisplay();
@@ -312,6 +352,7 @@ function update() {
   const sensitivity = weatherSensitivityCache.get(selectedDate.getUTCFullYear());
   if (coloring === "weather" && sensitivity?.domain) document.querySelector("#weather-sensitivity-domain").textContent = `Scale clipped at ±${Math.round(sensitivity.domain)}%; exact values shown in Station Summary.`;
   MapLayerUtils.setStationHeatmapVisibility(map, coloring, selectedId !== null);
+  const corridorMode = updateCorridors();
   let shown = tuples.filter(([origin, destination, count]) => {
     if (count < minimumRideCount()) return false;
     if (selectedId === null) return true;
@@ -328,14 +369,14 @@ function update() {
       geometry: {type: "LineString", coordinates}
     };
   }).filter(Boolean);
-  map.getSource("flows").setData({type: "FeatureCollection", features: connectionsEnabled() ? features : []});
-  rebuildParticles(features);
+  map.getSource("flows").setData({type: "FeatureCollection", features: connectionsEnabled() && !corridorMode ? features : []});
+  rebuildParticles(corridorMode ? [] : features);
   loadSelectedRoutes();
   map.getSource("stations").setData(stationGeoJSON(tuples, statistics));
   const rideCount = features.reduce((sum, feature) => sum + feature.properties.count, 0);
   const rides = `${rideCount.toLocaleString()} rides`;
-  document.querySelector("#all-rides").textContent = `${rides} shown`;
-  document.querySelector("#collapsed-status").textContent = `${periodText(true)} · ${rides}`;
+  document.querySelector("#all-rides").textContent = corridorMode ? `Estimated corridors · ${CorridorGeometry.periodLabel(selectedDate.getUTCFullYear())}` : `${rides} shown`;
+  document.querySelector("#collapsed-status").textContent = corridorMode ? `Estimated corridors · ${CorridorGeometry.periodLabel(selectedDate.getUTCFullYear())}` : `${periodText(true)} · ${rides}`;
   const summary = document.querySelector("#station-summary");
   summary.hidden = selectedId === null;
   if (selectedId !== null) {
@@ -425,6 +466,11 @@ async function navigateTime(unit, amount) {
 
 function addDataLayers() {
   const {ensureSource, ensureLayer} = MapLayerUtils;
+  ensureSource(map, "corridors", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+  ensureLayer(map, {id: "corridors", type: "line", source: "corridors", paint: {
+    "line-color": "#287d8e", "line-opacity": .68,
+    "line-width": ["interpolate", ["exponential", 1.35], ["get", "trips"], 1, .7, 50, 1.2, 500, 2.5, 5000, 5, 25000, 8]
+  }});
   ensureSource(map, "flows", {type: "geojson", data: {type: "FeatureCollection", features: []}});
   ensureLayer(map, {id: "flows", type: "line", source: "flows", paint: {
     "line-color": "#006bb6", "line-opacity": ["+", 0.2, ["*", 0.65, ["get", "scale"]]], "line-width": ["+", 1, ["*", 7, ["get", "scale"]]]
@@ -482,6 +528,16 @@ function addDataLayers() {
 
 map.on("load", async () => {
   addDataLayers();
+  const showCorridorPopup = event => {
+    const feature = event.features?.[0];
+    if (!feature || !selectedDate) return;
+    corridorPopup.setLngLat(event.lngLat).setHTML(
+      `<strong>Estimated trips: ${Number(feature.properties.trips).toLocaleString()}</strong><br>${CorridorGeometry.periodLabel(selectedDate.getUTCFullYear())}`
+    ).addTo(map);
+  };
+  map.on("mousemove", "corridors", event => { map.getCanvas().style.cursor = "pointer"; showCorridorPopup(event); });
+  map.on("click", "corridors", showCorridorPopup);
+  map.on("mouseleave", "corridors", () => { map.getCanvas().style.cursor = ""; corridorPopup.remove(); });
   map.on("click", "stations", event => { closeInsightVisualization(); selectedId = Number(event.features[0].properties.id); update(); });
   map.on("mouseenter", "stations", () => { map.getCanvas().style.cursor = "pointer"; });
   map.on("mouseleave", "stations", () => { map.getCanvas().style.cursor = ""; });
