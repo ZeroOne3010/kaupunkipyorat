@@ -156,8 +156,12 @@ trip count. Route curves and original vertices are retained. In EPSG:3067,
 buffer-overlap boundaries split each route where its set of nearby routes
 changes; reversed lines and lines with different vertex spacing can therefore
 share a corridor without a resampling grid. The default four-metre tolerance is
-a geometric conflation allowance. Adjacent equal-weight pieces are merged only
-through unambiguous line continuations.
+a geometric conflation allowance. Nearby pieces must also cover one another
+along their length with local headings within 30 degrees, so perpendicular
+crossings are not treated as shared corridors. A representative suppresses a
+duplicate only when both pieces have the same complete route-membership set;
+this preserves demand where proximity is non-transitive. Adjacent equal-weight
+pieces are merged only through unambiguous line continuations.
 
 Known limitations are inherent to route inference and conflation: Digitransit's
 shortest route need not be a rider's chosen route; routing data can change over

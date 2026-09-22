@@ -50,6 +50,18 @@ class BuildCorridorsTests(unittest.TestCase):
     def test_separate_parallel_routes_are_not_merged(self):
         self.assertEqual(self.weights([([(0, 0), (10, 0)], 2), ([(0, 5), (10, 5)], 8)], 4), [2, 8])
 
+    def test_non_transitive_parallel_membership_preserves_every_route(self):
+        result = self.weights([([(0, 0), (10, 0)], 2),
+                               ([(0, 3), (10, 3)], 4),
+                               ([(0, 6), (10, 6)], 8)], 4)
+        self.assertEqual(result, [6, 12, 14])
+
+    def test_perpendicular_crossing_routes_do_not_share_weight_or_leave_gaps(self):
+        result = self.aggregate([([(-10, 0), (10, 0)], 3),
+                                 ([(0, -10), (0, 10)], 7)], 4)
+        self.assertEqual(sorted(weight for _, weight in result), [3, 7])
+        self.assertEqual(sorted(round(line.length) for line, _ in result), [20, 20])
+
     def test_same_station_excluded_and_missing_route_reported(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); data = root / "data"; routes = root / "routes"

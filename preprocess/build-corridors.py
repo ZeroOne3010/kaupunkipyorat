@@ -11,6 +11,7 @@ small: it is a geometric conflation allowance, not a sampling interval.
 import argparse
 import gzip
 import json
+import math
 import statistics
 from collections import defaultdict
 from pathlib import Path
@@ -120,13 +121,47 @@ def _line_parts(geometry):
     return [line for part in getattr(geometry, "geoms", ()) for line in _line_parts(part)]
 
 
+def _vector_between(line, start, end):
+    first = line.interpolate(start)
+    last = line.interpolate(end)
+    return last.x - first.x, last.y - first.y
+
+
+def _parallel_coverage(piece, route, tolerance, minimum_cosine=math.cos(math.radians(30))):
+    """Whether route follows the whole piece nearby in either direction.
+
+    Distance alone incorrectly conflates perpendicular crossings.  Requiring a
+    similar local tangent and longitudinal coverage also distinguishes a path
+    which merely touches an endpoint from one which represents the same corridor.
+    """
+    midpoint = piece.interpolate(0.5, normalized=True)
+    samples = (Point(piece.coords[0]), midpoint, Point(piece.coords[-1]))
+    if any(route.distance(point) > tolerance + 1e-7 for point in samples):
+        return False
+    piece_vector = _vector_between(piece, 0, piece.length)
+    position = route.project(midpoint)
+    radius = min(max(tolerance, piece.length / 4), route.length / 2)
+    route_vector = _vector_between(route, max(0, position - radius), min(route.length, position + radius))
+    piece_norm = math.hypot(*piece_vector)
+    route_norm = math.hypot(*route_vector)
+    if not piece_norm or not route_norm:
+        return False
+    cosine = abs((piece_vector[0] * route_vector[0] + piece_vector[1] * route_vector[1])
+                 / (piece_norm * route_norm))
+    if cosine < minimum_cosine:
+        return False
+    projections = [route.project(samples[0]), route.project(samples[-1])]
+    return abs(projections[1] - projections[0]) >= piece.length * 0.5
+
+
 def aggregate_corridors(records, tolerance):
     """Return exact-weight metric lines and the pre-merge piece count.
 
-    Buffer intersections locate overlap/branch boundaries.  Midpoint membership
-    then assigns each piece a stable set of covering OD routes.  Only the lowest
-    route index in that set emits geometry, preventing an OD route from being
-    counted twice after overlay operations.
+    Buffer intersections locate overlap/branch boundaries.  Whole-piece distance
+    and tangent checks assign each piece a stable set of covering OD routes.
+    Equivalent pieces are suppressed only if an already selected representative
+    emits that same membership, preventing both duplicate counting and demand
+    loss when geometric proximity is non-transitive.
     """
     if not records:
         return [], 0
@@ -163,20 +198,25 @@ def aggregate_corridors(records, tolerance):
                     cuts.add(line.project(point))
         split_points.append(sorted(cuts))
 
-    emitted = []
+    atomic = []
     for owner, line in enumerate(lines):
         cuts = split_points[owner]
         for start, end in zip(cuts, cuts[1:]):
             if end - start < 0.01:
                 continue
             piece = substring(line, start, end)
-            midpoint = piece.interpolate(0.5, normalized=True)
             covering = tuple(index for index in candidate_sets[owner]
-                             if lines[index].distance(midpoint) <= tolerance
-                             and lines[index].intersection(piece.buffer(tolerance)).length >= piece.length * 0.5)
-            if not covering or owner != min(covering):
-                continue
-            emitted.append((piece, sum(records[index]["weight"] for index in covering)))
+                             if index == owner or _parallel_coverage(piece, lines[index], tolerance))
+            atomic.append((owner, piece, covering))
+
+    emitted = []
+    representatives = defaultdict(list)
+    for _owner, piece, covering in atomic:
+        if any(_parallel_coverage(piece, representative, tolerance)
+               for representative in representatives[covering]):
+            continue
+        representatives[covering].append(piece)
+        emitted.append((piece, sum(records[index]["weight"] for index in covering)))
 
     before = len(emitted)
     merged = []

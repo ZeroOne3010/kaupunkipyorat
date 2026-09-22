@@ -335,7 +335,7 @@ function updateCorridors() {
   } else {
     document.querySelector("#data-notice").textContent = corridors ? "" : `Estimated cycling corridors are unavailable for ${CorridorGeometry.periodLabel(year)}.`;
   }
-  return true;
+  return Boolean(corridors);
 }
 
 function update() {
