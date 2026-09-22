@@ -295,13 +295,15 @@ def aggregate_corridors(records, tolerance, diagnostics=None, overall_start=None
         coverage_seconds += time.perf_counter() - started
         return result
 
-    covered_atomic = []
     phase_start = time.perf_counter()
     covering_calls_start = coverage_calls
     for position, (owner, piece) in enumerate(atomic, 1):
         covering = tuple(index for index in candidate_sets[owner]
                          if index == owner or covered(piece, lines[index]))
-        covered_atomic.append((owner, piece, covering))
+        # Replace the entry rather than retaining a second list containing every
+        # geometry. Full-season builds can produce enough pieces for that extra
+        # list of tuples to materially increase peak memory.
+        atomic[position - 1] = (owner, piece, covering)
         if position % 5000 == 0 or position == len(atomic):
             log_progress("Atomic-piece coverage", position, len(atomic), phase_start, overall_start)
     diagnostics["covering_seconds"] = log_phase(
@@ -312,9 +314,9 @@ def aggregate_corridors(records, tolerance, diagnostics=None, overall_start=None
     representatives = defaultdict(list)
     phase_start = time.perf_counter()
     dedup_calls_start = coverage_calls
-    for position, (_owner, piece, covering) in enumerate(covered_atomic, 1):
-        if position % 5000 == 0 or position == len(covered_atomic):
-            log_progress("Representative deduplication", position, len(covered_atomic), phase_start, overall_start)
+    for position, (_owner, piece, covering) in enumerate(atomic, 1):
+        if position % 5000 == 0 or position == len(atomic):
+            log_progress("Representative deduplication", position, len(atomic), phase_start, overall_start)
         if any(covered(piece, representative)
                for representative in representatives[covering]):
             continue
