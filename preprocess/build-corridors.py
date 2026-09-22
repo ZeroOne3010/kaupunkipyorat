@@ -335,7 +335,13 @@ def aggregate_corridors(records, tolerance, diagnostics=None, overall_start=None
     for line, weight in emitted:
         by_weight[weight].append(line)
     for weight in sorted(by_weight):
-        geometry = linemerge(unary_union(by_weight[weight]))
+        geometry = unary_union(by_weight[weight])
+        # Shapely 2 rejects a LineString as input to linemerge.  A union of a
+        # single piece (or of pieces that already form one continuous line) is
+        # already fully merged, so only ask linemerge to process multipart
+        # output.
+        if geometry.geom_type != "LineString":
+            geometry = linemerge(geometry)
         merged.extend((line, weight) for line in _line_parts(geometry))
     diagnostics["merge_seconds"] = log_phase("merging equal-weight geometry", phase_start, overall_start)
     diagnostics.update({"emitted_before_merge": before, "pieces_after_merge": len(merged)})
