@@ -75,6 +75,27 @@ class BuildCorridorsTests(unittest.TestCase):
             self.assertEqual(loaded, [])
             self.assertEqual(missing, [(1, 2)])
 
+    def test_max_routes_limits_successful_routes_in_deterministic_order(self):
+        with tempfile.TemporaryDirectory() as directory:
+            routes = Path(directory)
+            encoded = corridors.encode_polyline([(0, 0), (1, 0)])
+            (routes / "1.json").write_text(json.dumps({"out": {"2": {"p": encoded},
+                                                                  "3": {"p": encoded}}}))
+            (routes / "2.json").write_text(json.dumps({"out": {"3": {"p": encoded}}}))
+            trips = {(2, 3): 4, (1, 3): 5, (1, 2): 6}
+            identity = type("T", (), {"transform": staticmethod(lambda x, y: (x, y))})()
+            limited, _ = corridors.load_routes(routes, trips, identity, max_routes=2)
+            unlimited, _ = corridors.load_routes(routes, trips, identity)
+            self.assertEqual([record["od"] for record in limited], [(1, 2), (1, 3)])
+            self.assertEqual([record["od"] for record in unlimited], [(1, 2), (1, 3), (2, 3)])
+
+    def test_distribution_statistics(self):
+        result = corridors.distribution([1, 2, 3, 4, 100])
+        self.assertEqual(result["min"], 1)
+        self.assertEqual(result["median"], 3)
+        self.assertEqual(result["mean"], 22)
+        self.assertEqual(result["max"], 100)
+
     def test_output_is_deterministic(self):
         inverse = type("T", (), {"transform": staticmethod(lambda x, y: (x, y))})()
         lines = [(LineString([(2, 2), (1, 1)]), 4), (LineString([(0, 0), (1, 0)]), 9)]

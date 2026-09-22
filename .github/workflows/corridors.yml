@@ -18,6 +18,11 @@ on:
         required: true
         default: "1"
         type: string
+      max_routes:
+        description: Optional diagnostic limit on routed OD records (empty means unlimited)
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -25,6 +30,7 @@ permissions:
 jobs:
   corridors:
     runs-on: ubuntu-latest
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,15 +38,24 @@ jobs:
           python-version: "3.12"
       - name: Install geometry dependencies
         run: python -m pip install --disable-pip-version-check shapely pyproj
+      - name: Test corridor preprocessing
+        run: python -m unittest preprocess/test_build_corridors.py
       - name: Build inferred season corridors
         env:
           YEAR: ${{ inputs.year }}
           TOLERANCE: ${{ inputs.tolerance_meters }}
           MINIMUM: ${{ inputs.minimum_trips }}
+          MAX_ROUTES: ${{ inputs.max_routes }}
         run: |
           [[ "$YEAR" =~ ^[0-9]{4}$ ]] || { echo "year must contain four digits" >&2; exit 1; }
+          MAX_ROUTES_ARGUMENT=()
+          if [[ -n "$MAX_ROUTES" ]]; then
+            [[ "$MAX_ROUTES" =~ ^[1-9][0-9]*$ ]] || { echo "max_routes must be empty or a positive integer" >&2; exit 1; }
+            MAX_ROUTES_ARGUMENT=(--max-routes "$MAX_ROUTES")
+          fi
           python preprocess/build-corridors.py "$YEAR" \
             --tolerance-meters "$TOLERANCE" --minimum-trips "$MINIMUM" \
+            "${MAX_ROUTES_ARGUMENT[@]}" \
             --output "output/$YEAR.json" --report "output/$YEAR-summary.txt"
       - name: Validate compact corridor JSON
         env:
