@@ -217,7 +217,7 @@ def aggregate_corridors(records, tolerance, diagnostics=None, overall_start=None
     diagnostics["strtree_seconds"] = log_phase("building the STRtree", phase_start, overall_start)
 
     def candidates(line):
-        found = tree.query(line.buffer(tolerance))
+        found = tree.query(line, predicate="dwithin", distance=tolerance)
         for item in found:
             if hasattr(item, "geom_type"):
                 yield from by_wkb[item.wkb]
