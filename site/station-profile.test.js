@@ -91,6 +91,12 @@ test("station profile charts remain alongside the main station history chart", (
   assert.match(html, />Net flow by day</);
 });
 
+test("combined flow charts render net flow as a line series", () => {
+  const source = fs.readFileSync(require.resolve("./station-profile.js"), "utf8");
+  assert.match(source, /className: "net", type: "line", values: values\("netFlow"\)/);
+  assert.match(source, /class: `chart-line \$\{series\.className\}`/);
+});
+
 test("season history aggregates station flows into points exactly one week apart", () => {
   const april = Array.from({length: 30}, () => []);
   const may = Array.from({length: 31}, () => []);

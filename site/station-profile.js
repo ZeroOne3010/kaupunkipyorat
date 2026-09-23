@@ -114,8 +114,9 @@
       });
     }
     svg.append(svgElement("line", {x1: left, x2: width - right, y1: baseline, y2: baseline, class: "chart-baseline"}));
-    options.series.forEach((series, seriesIndex) => series.values.forEach((value, index) => {
-      const seriesWidth = groupWidth / options.series.length;
+    const barSeries = options.series.filter(series => series.type !== "line");
+    barSeries.forEach((series, seriesIndex) => series.values.forEach((value, index) => {
+      const seriesWidth = groupWidth / barSeries.length;
       const padding = Math.min(2, seriesWidth * .15);
       const valueY = y(value);
       const bar = svgElement("rect", {
@@ -125,6 +126,10 @@
       });
       svg.append(bar);
     }));
+    options.series.filter(series => series.type === "line").forEach(series => {
+      const points = series.values.map((value, index) => `${left + (index + .5) * groupWidth},${y(value)}`);
+      svg.append(svgElement("polyline", {points: points.join(" "), class: `chart-line ${series.className}`}));
+    });
     if (weather) {
       const temperatures = weather.flatMap(item => [item.temperature, item.minimumTemperature, item.maximumTemperature])
         .filter(value => value !== null && value !== undefined);
@@ -253,7 +258,7 @@
       series: [
         {className: "arrivals", values: values("arrivals")},
         {className: "departures", values: values("departures")},
-        {className: "net", values: values("netFlow")}
+        {className: "net", type: "line", values: values("netFlow")}
       ],
       points: history.map(item => ({tooltip: `${options.pointLabel(item)}\n${count(item.arrivals)} arrivals · ${count(item.departures)} departures\nNet ${item.netFlow > 0 ? "+" : ""}${count(item.netFlow)}`})),
       ticks: options.ticks,

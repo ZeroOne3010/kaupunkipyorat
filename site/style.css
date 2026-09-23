@@ -285,7 +285,8 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .chart-bar.net { fill: #2f9e72; }
 .chart-bar.net.negative { fill: #dc6670; }
 .chart-bar.net.neutral { fill: #8193a2; }
-.chart-key.net { background: linear-gradient(135deg, #dc6670 0 48%, #2f9e72 52% 100%); }
+.chart-line.net { fill: none; stroke: #7b2cbf; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.chart-key.net { height: 3px; border-radius: 0; background: #7b2cbf; vertical-align: middle; }
 .chart-precipitation { fill: #1683cf; opacity: .2; }
 .chart-temperature { fill: none; stroke: #ed6a00; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: .72; pointer-events: none; }
 .chart-temperature-range { fill: #ed6a00; opacity: .09; stroke: none; pointer-events: none; }
