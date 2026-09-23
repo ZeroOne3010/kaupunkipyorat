@@ -26,6 +26,65 @@ class BuildCorridorsTests(unittest.TestCase):
         points = [(24.94123, 60.17111), (24.94234, 60.17222), (24.94444, 60.17123)]
         self.assertEqual(corridors.decode_polyline(corridors.encode_polyline(points)), points)
 
+    def test_e5_decoder_preserves_exact_integer_coordinates(self):
+        encoded = corridors.encode_polyline([(24.94123, 60.17111), (24.94124, 60.17112)])
+        self.assertEqual(corridors.decode_polyline_e5(encoded),
+                         [(2494123, 6017111), (2494124, 6017112)])
+
+    def test_consecutive_vertices_make_canonical_primitive_edges(self):
+        points = [(3, 1), (2, 1), (4, 5), (7, 8)]
+        self.assertEqual(list(corridors.primitive_edges(points)),
+                         [((2, 1), (3, 1)), ((2, 1), (4, 5)), ((4, 5), (7, 8))])
+
+    def test_exact_edges_collapse_directions_and_identical_edges(self):
+        records = [
+            {"coordinates_e5": [(1, 1), (2, 2)], "weight": 3},
+            {"coordinates_e5": [(2, 2), (1, 1)], "weight": 5},
+            {"coordinates_e5": [(1, 1), (2, 2)], "weight": 7},
+        ]
+        edges = corridors.build_exact_edges(records)
+        self.assertEqual(edges, [{"edge": ((1, 1), (2, 2)), "weight": 15, "route_count": 3}])
+
+    def test_curved_polyline_preserves_all_primitive_edges(self):
+        points = [(0, 0), (1, 3), (2, 1), (4, 4)]
+        edges = corridors.build_exact_edges([{"coordinates_e5": points, "weight": 2}])
+        self.assertEqual([edge["edge"] for edge in edges], sorted(corridors.primitive_edges(points)))
+        self.assertEqual(len(edges), 3)
+
+    def test_route_repeated_edge_is_weighted_only_once(self):
+        diagnostics = {}
+        edges = corridors.build_exact_edges([
+            {"coordinates_e5": [(0, 0), (1, 0), (0, 0), (1, 0)], "weight": 9}
+        ], diagnostics)
+        self.assertEqual(edges[0]["weight"], 9)
+        self.assertEqual(edges[0]["route_count"], 1)
+        self.assertEqual(diagnostics["repeated_edges_deduplicated"], 2)
+
+    def test_partially_shared_exact_edges_accumulate_correct_weights(self):
+        records = [
+            {"coordinates_e5": [(0, 0), (1, 0), (2, 0)], "weight": 4},
+            {"coordinates_e5": [(1, 0), (2, 0), (3, 1)], "weight": 6},
+        ]
+        edges = {edge["edge"]: edge["weight"] for edge in corridors.build_exact_edges(records)}
+        self.assertEqual(edges, {((0, 0), (1, 0)): 4, ((1, 0), (2, 0)): 10,
+                                 ((2, 0), (3, 1)): 6})
+
+    def test_zero_length_edges_are_skipped_and_reported(self):
+        diagnostics = {}
+        edges = corridors.build_exact_edges([
+            {"coordinates_e5": [(1, 1), (1, 1), (2, 2)], "weight": 3}
+        ], diagnostics)
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(diagnostics["primitive_edge_occurrences"], 2)
+        self.assertEqual(diagnostics["zero_length_edges_skipped"], 1)
+
+    def test_exact_matching_has_no_floating_point_tolerance(self):
+        edges = corridors.build_exact_edges([
+            {"coordinates_e5": [(0, 0), (1, 0)], "weight": 2},
+            {"coordinates_e5": [(0, 1), (1, 1)], "weight": 3},
+        ])
+        self.assertEqual(len(edges), 2)
+
     def test_identical_and_opposite_routes_overlap(self):
         line = [(0, 0), (10, 0)]
         self.assertEqual(self.weights([(line, 5), (line, 7)]), [12])
@@ -101,6 +160,19 @@ class BuildCorridorsTests(unittest.TestCase):
     def test_even_sampling_larger_than_available_returns_all(self):
         records = list(range(4))
         self.assertIs(corridors.evenly_sample(records, 10), records)
+
+    def test_sampling_happens_before_unselected_polylines_are_decoded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            routes = Path(directory)
+            valid = corridors.encode_polyline([(0, 0), (1, 0)])
+            destinations = {str(index): {"p": (valid if index in (1, 3) else "invalid")}
+                            for index in range(1, 5)}
+            (routes / "0.json").write_text(json.dumps({"out": destinations}))
+            trips = {(0, index): 1 for index in range(1, 5)}
+            identity = type("T", (), {"transform": staticmethod(lambda x, y: (x, y))})()
+            loaded, missing = corridors.load_routes(routes, trips, identity, sample_routes=2)
+            self.assertEqual([record["od"] for record in loaded], [(0, 1), (0, 3)])
+            self.assertEqual(missing, [])
 
     def test_no_route_limit_keeps_all_records(self):
         records = list(range(12))
