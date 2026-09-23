@@ -52,6 +52,35 @@
     return counts;
   }
 
+  function allocateRandomCounts(flows, cap, random = Math.random) {
+    const counts = new Array(flows.length).fill(0);
+    if (!flows.length || cap < 1) return counts;
+    const eligible = flows.map((flow, index) => ({
+      index,
+      weight: Math.sqrt(Math.max(0, flow.count || 0))
+    })).filter(item => item.weight > 0);
+    if (!eligible.length) return counts;
+    const minimumWeight = Math.min(...eligible.map(item => item.weight));
+    let totalWeight = 0;
+    eligible.forEach(item => {
+      item.weight = Math.min(item.weight, minimumWeight * 10);
+      totalWeight += item.weight;
+      item.cumulativeWeight = totalWeight;
+    });
+    for (let particleIndex = 0; particleIndex < cap; particleIndex += 1) {
+      const target = random() * totalWeight;
+      let low = 0;
+      let high = eligible.length - 1;
+      while (low < high) {
+        const middle = (low + high) >> 1;
+        if (target < eligible[middle].cumulativeWeight) high = middle;
+        else low = middle + 1;
+      }
+      counts[eligible[low].index] += 1;
+    }
+    return counts;
+  }
+
   function positionAt(path, distance, output) {
     const target = ((distance % path.totalLength) + path.totalLength) % path.totalLength;
     let low = 1;
@@ -71,23 +100,27 @@
     return output;
   }
 
-  function createParticles(flows, cap) {
+  function createParticles(flows, cap, random = Math.random) {
     const preparedFlows = flows.map(flow => ({
       count: flow.count,
       path: preparePath(flow.coordinates),
       bidirectional: Boolean(flow.bidirectional)
     })).filter(flow => flow.path);
-    const allocation = allocateCounts(preparedFlows, cap);
+    const corridorMode = preparedFlows.length > 0 && preparedFlows.every(flow => flow.bidirectional);
+    const allocation = corridorMode
+      ? allocateRandomCounts(preparedFlows, cap, random)
+      : allocateCounts(preparedFlows, cap);
     const particles = [];
     preparedFlows.forEach((flow, flowIndex) => {
       const count = allocation[flowIndex];
       for (let index = 0; index < count; index += 1) {
-        const distance = flow.path.totalLength * (index + Math.random()) / count;
-        particles.push({path: flow.path, distance, direction: flow.bidirectional && index % 2 ? -1 : 1});
+        const distance = flow.path.totalLength * (index + random()) / count;
+        const direction = flow.bidirectional && random() < 0.5 ? -1 : 1;
+        particles.push({path: flow.path, distance, direction});
       }
     });
     return particles;
   }
 
-  return {allocateCounts, createParticles, distanceMeters, positionAt, preparePath};
+  return {allocateCounts, allocateRandomCounts, createParticles, distanceMeters, positionAt, preparePath};
 });
