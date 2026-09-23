@@ -72,14 +72,18 @@
   }
 
   function createParticles(flows, cap) {
-    const preparedFlows = flows.map(flow => ({count: flow.count, path: preparePath(flow.coordinates)})).filter(flow => flow.path);
+    const preparedFlows = flows.map(flow => ({
+      count: flow.count,
+      path: preparePath(flow.coordinates),
+      bidirectional: Boolean(flow.bidirectional)
+    })).filter(flow => flow.path);
     const allocation = allocateCounts(preparedFlows, cap);
     const particles = [];
     preparedFlows.forEach((flow, flowIndex) => {
       const count = allocation[flowIndex];
       for (let index = 0; index < count; index += 1) {
         const distance = flow.path.totalLength * (index + Math.random()) / count;
-        particles.push({path: flow.path, distance});
+        particles.push({path: flow.path, distance, direction: flow.bidirectional && index % 2 ? -1 : 1});
       }
     });
     return particles;

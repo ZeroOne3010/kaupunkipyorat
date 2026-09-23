@@ -32,4 +32,12 @@ test("particle positions are staggered and remain on their shared prepared path"
   assert.equal(particles.length, 4);
   assert.equal(new Set(particles.map(particle => particle.path)).size, 1);
   assert.deepEqual(particles.map(particle => particle.distance / particle.path.totalLength), [0.125, 0.375, 0.625, 0.875]);
+  assert.deepEqual(particles.map(particle => particle.direction), [1, 1, 1, 1]);
+});
+
+test("bidirectional flows alternate particle direction", () => {
+  const particles = FlowParticles.createParticles([{
+    count: 20, coordinates: [[0, 0], [0.01, 0]], bidirectional: true
+  }], 4);
+  assert.deepEqual(particles.map(particle => particle.direction), [1, -1, 1, -1]);
 });

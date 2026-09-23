@@ -28,7 +28,10 @@ const weatherAnalysisRememberedMonths = new Map();
 let profileWeather = null;
 let profileWeatherContext = null;
 let stationProfileRequestId = 0;
-const MAX_FLOW_PARTICLES = 150;
+// Separate caps make it straightforward to tune either view, or replace these
+// with refresh-rate-derived budgets later without changing particle creation.
+const MAX_SELECTED_FLOW_PARTICLES = 500;
+const MAX_MAP_FLOW_PARTICLES = 3000;
 const PARTICLE_SPEED_METERS_PER_SECOND = 95;
 let flowParticles = [];
 let particleFrame = null;
@@ -260,7 +263,7 @@ function particleFrameData(timestamp) {
   if (!particleInteractionPaused) {
     const elapsed = particleLastTime === null ? 0 : Math.min(0.1, (timestamp - particleLastTime) / 1000);
     flowParticles.forEach(particle => {
-      particle.distance = (particle.distance + elapsed * PARTICLE_SPEED_METERS_PER_SECOND) % particle.path.totalLength;
+      particle.distance = (particle.distance + particle.direction * elapsed * PARTICLE_SPEED_METERS_PER_SECOND) % particle.path.totalLength;
       FlowParticles.positionAt(particle.path, particle.distance, particle.feature.geometry.coordinates);
     });
     map.getSource("flow-particles")?.setData(particleFeatureCollection);
@@ -269,13 +272,14 @@ function particleFrameData(timestamp) {
   particleFrame = requestAnimationFrame(particleFrameData);
 }
 
-function rebuildParticles(flowFeatures) {
+function rebuildParticles(flowFeatures, cap, bidirectional = false) {
   clearParticles();
-  if (!particlesEnabled() || document.hidden || selectedId === null) return;
+  if (!particlesEnabled() || document.hidden) return;
   flowParticles = FlowParticles.createParticles(flowFeatures.map(feature => ({
-    count: feature.properties.count,
-    coordinates: feature.geometry.coordinates
-  })), MAX_FLOW_PARTICLES);
+    count: feature.properties.count ?? feature.properties.trips,
+    coordinates: feature.geometry.coordinates,
+    bidirectional
+  })), cap);
   particleFeatureCollection.features = flowParticles.map(particle => {
     const coordinates = FlowParticles.positionAt(particle.path, particle.distance, [0, 0]);
     particle.feature = {type: "Feature", properties: {}, geometry: {type: "Point", coordinates}};
@@ -372,7 +376,14 @@ function update() {
     };
   }).filter(Boolean);
   map.getSource("flows").setData({type: "FeatureCollection", features: connectionsEnabled() && !corridorMode ? features : []});
-  rebuildParticles(corridorMode ? [] : features);
+  const corridorFeatures = corridorMode
+    ? (corridorCache.get(selectedDate.getUTCFullYear())?.geojson.features || [])
+    : [];
+  rebuildParticles(
+    corridorMode ? corridorFeatures : features,
+    selectedId === null ? MAX_MAP_FLOW_PARTICLES : MAX_SELECTED_FLOW_PARTICLES,
+    corridorMode
+  );
   loadSelectedRoutes();
   map.getSource("stations").setData(stationGeoJSON(tuples, statistics));
   const rideCount = features.reduce((sum, feature) => sum + feature.properties.count, 0);
