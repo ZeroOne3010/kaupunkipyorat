@@ -51,9 +51,11 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .navigation-gap { width: 6px; }
 .filter-row { display: flex; align-items: center; gap: 9px; }
 .direction-control { flex: 1 1 auto; }
-.color-row, .geometry-row, .particles-row { display: flex; align-items: center; gap: 9px; color: #526a7e; font-size: 12px; font-weight: 700; }
+.color-row, .heatmap-row, .geometry-row, .particles-row { display: flex; align-items: center; gap: 9px; color: #526a7e; font-size: 12px; font-weight: 700; }
 .color-control { width: min(100%, 290px); }
 .color-control label, .geometry-control label { padding-block: 5px; }
+.heatmap-control { width: 112px; }
+.heatmap-control label { padding-block: 5px; }
 .geometry-control { width: 210px; }
 .corridor-explanation { max-width: 560px; padding: 8px 10px; border-left: 3px solid #557f9e; border-radius: 3px; background: rgba(85,127,158,.09); color: #526a7e; font-size: 12px; line-height: 1.35; }
 .corridor-explanation strong { display: block; color: #17324d; }
@@ -138,6 +140,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 [data-theme="dark"] .station-profile { border-color: #405364; background: #142330; box-shadow: 0 8px 36px #000b; }
 [data-theme="dark"] .eyebrow,
 [data-theme="dark"] .color-row,
+[data-theme="dark"] .heatmap-row,
 [data-theme="dark"] .geometry-row,
 [data-theme="dark"] .particles-row,
 [data-theme="dark"] .hint,

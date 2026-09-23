@@ -351,7 +351,8 @@ function update() {
   document.querySelector("#weather-sensitivity-legend").hidden = coloring !== "weather";
   const sensitivity = weatherSensitivityCache.get(selectedDate.getUTCFullYear());
   if (coloring === "weather" && sensitivity?.domain) document.querySelector("#weather-sensitivity-domain").textContent = `Scale clipped at ±${Math.round(sensitivity.domain)}%; exact values shown in Station Summary.`;
-  MapLayerUtils.setStationHeatmapVisibility(map, coloring, selectedId !== null);
+  const heatmapEnabled = document.querySelector('input[name="heatmap"]:checked').value === "on";
+  MapLayerUtils.setStationHeatmapVisibility(map, coloring, selectedId !== null, heatmapEnabled);
   const corridorMode = updateCorridors();
   let shown = tuples.filter(([origin, destination, count]) => {
     if (count < minimumRideCount()) return false;
@@ -579,6 +580,7 @@ document.querySelectorAll('input[name="coloring"]').forEach(input => input.addEv
   update();
   if (weather) prepareWeatherSensitivity();
 }));
+document.querySelectorAll('input[name="heatmap"]').forEach(input => input.addEventListener("change", update));
 document.querySelectorAll('input[name="geometry"]').forEach(input => input.addEventListener("change", () => {
   updateParticleControl();
   update();
