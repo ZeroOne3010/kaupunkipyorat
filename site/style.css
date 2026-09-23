@@ -163,6 +163,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 [data-theme="dark"] .insight-details,
 [data-theme="dark"] .insights-unavailable,
 [data-theme="dark"] .profile-month,
+[data-theme="dark"] .summary-chart-section > p,
 [data-theme="dark"] .profile-chart-section > p,
 [data-theme="dark"] .chart-axis-label,
 [data-theme="dark"] .chart-value-label { color: #aebdca; fill: #aebdca; }
