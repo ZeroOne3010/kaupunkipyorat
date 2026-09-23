@@ -2,17 +2,17 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 DEPENDENCIES = importlib.util.find_spec("shapely") and importlib.util.find_spec("pyproj")
 if DEPENDENCIES:
     from shapely.geometry import LineString
-    spec = importlib.util.spec_from_file_location("build_corridors", Path(__file__).with_name("build-corridors.py"))
-    corridors = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(corridors)
+spec = importlib.util.spec_from_file_location("build_corridors", Path(__file__).with_name("build-corridors.py"))
+corridors = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(corridors)
 
 
-@unittest.skipUnless(DEPENDENCIES, "Shapely and pyproj are required")
 class BuildCorridorsTests(unittest.TestCase):
     def aggregate(self, definitions, tolerance=1):
         records = [{"od": (index, index + 1), "weight": weight, "line": LineString(points)}
@@ -30,6 +30,47 @@ class BuildCorridorsTests(unittest.TestCase):
         encoded = corridors.encode_polyline([(24.94123, 60.17111), (24.94124, 60.17112)])
         self.assertEqual(corridors.decode_polyline_e5(encoded),
                          [(2494123, 6017111), (2494124, 6017112)])
+
+    def test_direct_e5_encoder_round_trip(self):
+        points = [(2494123, 6017111), (2494124, 6017112), (-7, -9)]
+        self.assertEqual(corridors.decode_polyline_e5(corridors.encode_polyline_e5(points)), points)
+
+    def test_equal_weight_edges_merge_and_preserve_vertices(self):
+        edges = [{"edge": ((0, 0), (1, 2)), "weight": 7},
+                 {"edge": ((1, 2), (3, 1)), "weight": 7}]
+        self.assertEqual(corridors.merge_exact_edges(edges),
+                         [(((0, 0), (1, 2), (3, 1)), 7)])
+
+    def test_different_weights_do_not_merge(self):
+        edges = [{"edge": ((0, 0), (1, 0)), "weight": 7},
+                 {"edge": ((1, 0), (2, 0)), "weight": 8}]
+        self.assertEqual(len(corridors.merge_exact_edges(edges)), 2)
+
+    def test_equal_weight_branch_does_not_merge_through_branch(self):
+        edges = [{"edge": ((0, 0), (1, 0)), "weight": 7},
+                 {"edge": ((1, 0), (2, 0)), "weight": 7},
+                 {"edge": ((1, 0), (1, 1)), "weight": 7}]
+        self.assertEqual(sorted(len(chain) - 1 for chain, _ in corridors.merge_exact_edges(edges)),
+                         [1, 1, 1])
+
+    def test_cycle_uses_every_edge_once_deterministically(self):
+        raw = [((0, 0), (1, 0)), ((1, 0), (1, 1)),
+               ((0, 1), (1, 1)), ((0, 0), (0, 1))]
+        edges = [{"edge": edge, "weight": 4} for edge in raw]
+        first = corridors.merge_exact_edges(edges)
+        second = corridors.merge_exact_edges(list(reversed(edges)))
+        self.assertEqual(first, second)
+        self.assertEqual(first[0][0][0], first[0][0][-1])
+        produced = [tuple(sorted(pair)) for pair in zip(first[0][0], first[0][0][1:])]
+        self.assertCountEqual(produced, raw)
+
+    def test_output_uses_exact_weights_orientation_and_order(self):
+        chains = [(((2, 0), (1, 0)), 3), (((0, 0), (1, 0)), 9)]
+        payload = corridors.exact_output_payload(2025, chains)
+        self.assertNotIn("toleranceMeters", payload)
+        self.assertEqual([row[1] for row in payload["corridors"]], [9, 3])
+        self.assertEqual(corridors.decode_polyline_e5(payload["corridors"][1][0]),
+                         [(1, 0), (2, 0)])
 
     def test_consecutive_vertices_make_canonical_primitive_edges(self):
         points = [(3, 1), (2, 1), (4, 5), (7, 8)]
@@ -90,16 +131,19 @@ class BuildCorridorsTests(unittest.TestCase):
         ])
         self.assertEqual(len(edges), 2)
 
+    @unittest.skipUnless(DEPENDENCIES, "Shapely and pyproj are required")
     def test_identical_and_opposite_routes_overlap(self):
         line = [(0, 0), (10, 0)]
         self.assertEqual(self.weights([(line, 5), (line, 7)]), [12])
         self.assertEqual(self.weights([(line, 5), (list(reversed(line)), 7)]), [12])
 
+    @unittest.skipUnless(DEPENDENCIES, "Shapely and pyproj are required")
     def test_curved_routes_with_different_vertex_spacing_match(self):
         sparse = [(0, 0), (5, 2), (10, 0)]
         dense = [(0, 0), (2.5, 1), (5, 2), (7.5, 1), (10, 0)]
         self.assertEqual(self.weights([(sparse, 11), (dense, 13)], .1), [24])
 
+    @unittest.skipUnless(DEPENDENCIES, "Shapely and pyproj are required")
     def test_partial_overlap_splits_at_branch(self):
         result = self.aggregate([([(0, 0), (10, 0)], 10), ([(0, 0), (5, 0), (5, 5)], 4)], .1)
         weights = [weight for _, weight in result]
@@ -107,19 +151,23 @@ class BuildCorridorsTests(unittest.TestCase):
         self.assertIn(10, weights)
         self.assertIn(4, weights)
 
+    @unittest.skipUnless(DEPENDENCIES, "Shapely and pyproj are required")
     def test_branching_routes_have_exact_post_branch_weights(self):
         result = self.weights([([(0, 0), (5, 0), (10, 3)], 3), ([(0, 0), (5, 0), (10, -3)], 7)], .1)
         self.assertEqual(result, [3, 7, 10])
 
+    @unittest.skipUnless(DEPENDENCIES, "Shapely and pyproj are required")
     def test_separate_parallel_routes_are_not_merged(self):
         self.assertEqual(self.weights([([(0, 0), (10, 0)], 2), ([(0, 5), (10, 5)], 8)], 4), [2, 8])
 
+    @unittest.skipUnless(DEPENDENCIES, "Shapely and pyproj are required")
     def test_non_transitive_parallel_membership_preserves_every_route(self):
         result = self.weights([([(0, 0), (10, 0)], 2),
                                ([(0, 3), (10, 3)], 4),
                                ([(0, 6), (10, 6)], 8)], 4)
         self.assertEqual(result, [6, 12, 14])
 
+    @unittest.skipUnless(DEPENDENCIES, "Shapely and pyproj are required")
     def test_perpendicular_crossing_routes_do_not_share_weight_or_leave_gaps(self):
         result = self.aggregate([([(-10, 0), (10, 0)], 3),
                                  ([(0, -10), (0, 10)], 7)], 4)
@@ -133,7 +181,7 @@ class BuildCorridorsTests(unittest.TestCase):
             for month in range(4, 11):
                 (data / f"2025-{month:02d}.json").write_text(json.dumps({"total": [[1, 1, 9], [1, 2, 3]]}))
             _, trips, excluded = corridors.seasonal_trips(data, 2025)
-            loaded, missing = corridors.load_routes(routes, trips, type("T", (), {"transform": staticmethod(lambda x, y: (x, y))})())
+            loaded, missing = corridors.load_routes(routes, trips, None, project=False)
             self.assertEqual(trips, {(1, 2): 21})
             self.assertEqual(excluded, 7)
             self.assertEqual(loaded, [])
@@ -148,8 +196,8 @@ class BuildCorridorsTests(unittest.TestCase):
             (routes / "2.json").write_text(json.dumps({"out": {"3": {"p": encoded}}}))
             trips = {(2, 3): 4, (1, 3): 5, (1, 2): 6}
             identity = type("T", (), {"transform": staticmethod(lambda x, y: (x, y))})()
-            limited, _ = corridors.load_routes(routes, trips, identity, max_routes=2)
-            unlimited, _ = corridors.load_routes(routes, trips, identity)
+            limited, _ = corridors.load_routes(routes, trips, identity, max_routes=2, project=False)
+            unlimited, _ = corridors.load_routes(routes, trips, identity, project=False)
             self.assertEqual([record["od"] for record in limited], [(1, 2), (1, 3)])
             self.assertEqual([record["od"] for record in unlimited], [(1, 2), (1, 3), (2, 3)])
 
@@ -175,7 +223,7 @@ class BuildCorridorsTests(unittest.TestCase):
             (routes / "0.json").write_text(json.dumps({"out": destinations}))
             trips = {(0, index): 1 for index in range(1, 5)}
             identity = type("T", (), {"transform": staticmethod(lambda x, y: (x, y))})()
-            loaded, missing = corridors.load_routes(routes, trips, identity, sample_routes=2)
+            loaded, missing = corridors.load_routes(routes, trips, identity, sample_routes=2, project=False)
             self.assertEqual([record["od"] for record in loaded], [(0, 1), (0, 3)])
             self.assertEqual(missing, [])
 
@@ -187,6 +235,27 @@ class BuildCorridorsTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             corridors.main(["2025", "--max-routes", "2", "--sample-routes", "2"])
 
+    def test_production_uses_exact_edges_not_legacy_aggregation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); data = root / "data"; routes = root / "routes"
+            data.mkdir(); routes.mkdir()
+            for month in range(4, 11):
+                (data / f"2025-{month:02d}.json").write_text(
+                    json.dumps({"total": [[1, 2, 3]]}))
+            encoded = corridors.encode_polyline_e5([(0, 0), (1, 0), (2, 0)])
+            (routes / "1.json").write_text(json.dumps({"out": {"2": {"p": encoded}}}))
+            output = root / "2025.json"
+            with mock.patch.object(corridors, "aggregate_corridors",
+                                   side_effect=AssertionError("legacy aggregation called")):
+                self.assertEqual(corridors.main(["2025", "--data", str(data),
+                                                 "--routes", str(routes),
+                                                 "--output", str(output)]), 0)
+            payload = json.loads(output.read_text())
+            self.assertNotIn("toleranceMeters", payload)
+            self.assertEqual(payload["corridors"][0][1], 21)
+            self.assertEqual(corridors.decode_polyline_e5(payload["corridors"][0][0]),
+                             [(0, 0), (1, 0), (2, 0)])
+
     def test_distribution_statistics(self):
         result = corridors.distribution([1, 2, 3, 4, 100])
         self.assertEqual(result["min"], 1)
@@ -194,6 +263,7 @@ class BuildCorridorsTests(unittest.TestCase):
         self.assertEqual(result["mean"], 22)
         self.assertEqual(result["max"], 100)
 
+    @unittest.skipUnless(DEPENDENCIES, "Shapely and pyproj are required")
     def test_output_is_deterministic(self):
         inverse = type("T", (), {"transform": staticmethod(lambda x, y: (x, y))})()
         lines = [(LineString([(2, 2), (1, 1)]), 4), (LineString([(0, 0), (1, 0)]), 9)]
