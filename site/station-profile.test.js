@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {monthlyHistory, dailyHistory, seasonHistory} = require("./station-profile.js");
+const fs = require("node:fs");
+const {monthlyHistory, dailyHistory, timeAwareHistory, navigationSelection, seasonHistory} = require("./station-profile.js");
 
 test("monthly history includes every day and all hours with shared station semantics", () => {
   const d = Array.from({length: 31}, () => []);
@@ -51,6 +52,43 @@ test("daily history keeps all 24 local-hour buckets aligned", () => {
   assert.deepEqual(history[0], {hour: 0, arrivals: 8, departures: 6, netFlow: 2});
   assert.deepEqual(history[1], {hour: 1, arrivals: 0, departures: 0, netFlow: 0});
   assert.deepEqual(history[2], {hour: 2, arrivals: 0, departures: 7, netFlow: -7});
+});
+
+test("time-aware history selects monthly days and the selected day's hours", () => {
+  const d = Array.from({length: 30}, () => []);
+  const h = Array.from({length: 30 * 24}, () => []);
+  d[1] = [[2, 1, 9]];
+  h[24 + 6] = [[1, 2, 4], [2, 1, 7]];
+  const monthData = {y: 2025, m: 4, d, h};
+  const date = new Date(Date.UTC(2025, 3, 2, 6));
+
+  assert.equal(timeAwareHistory("month", 1, monthData, date)[1].arrivals, 9);
+  assert.deepEqual(timeAwareHistory("day", 1, monthData, date)[6], {hour: 6, arrivals: 7, departures: 4, netFlow: 3});
+  assert.deepEqual(timeAwareHistory("hour", 1, monthData, date)[6], {hour: 6, arrivals: 7, departures: 4, netFlow: 3});
+});
+
+test("chart navigation selects a day or hour without changing the station", () => {
+  const initial = new Date(Date.UTC(2025, 3, 10, 5));
+  const day = navigationSelection(initial, 42, "day", 22);
+  const hour = navigationSelection(day.selectedDate, day.selectedStationId, "hour", 17);
+
+  assert.equal(day.selectedDate.toISOString(), "2025-04-22T05:00:00.000Z");
+  assert.equal(day.mode, "day");
+  assert.equal(hour.selectedDate.toISOString(), "2025-04-22T17:00:00.000Z");
+  assert.equal(hour.mode, "hour");
+  assert.equal(hour.selectedStationId, 42);
+  assert.equal(initial.toISOString(), "2025-04-10T05:00:00.000Z");
+});
+
+test("station profile charts remain alongside the main station history chart", () => {
+  const html = fs.readFileSync(require.resolve("./index.html"), "utf8");
+  assert.match(html, /id="station-history-chart"/);
+  assert.match(html, /id="profile-daily-chart"/);
+  assert.match(html, /id="profile-hourly-chart"/);
+  assert.match(html, /id="profile-net-chart"/);
+  assert.match(html, />Activity by day</);
+  assert.match(html, />Typical day</);
+  assert.match(html, />Net flow by day</);
 });
 
 test("season history aggregates station flows into points exactly one week apart", () => {

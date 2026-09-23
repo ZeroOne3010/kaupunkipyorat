@@ -47,6 +47,18 @@
     });
   }
 
+  function timeAwareHistory(mode, stationId, monthData, date) {
+    return mode === "month" ? monthlyHistory(stationId, monthData).daily
+      : dailyHistory(stationId, monthData, date.getUTCDate());
+  }
+
+  function navigationSelection(selectedDate, selectedStationId, mode, value) {
+    const date = new Date(selectedDate);
+    if (mode === "day") date.setUTCDate(value);
+    else if (mode === "hour") date.setUTCHours(value);
+    return {selectedDate: date, selectedStationId, mode};
+  }
+
   function seasonHistory(stationId, months) {
     const days = months.slice().sort((a, b) => a.m - b.m).flatMap(month =>
       monthlyHistory(stationId, month).daily.map(day => ({
@@ -89,6 +101,9 @@
     (options.weekends || []).forEach(index => svg.append(svgElement("rect", {
       x: left + index * groupWidth, y: top, width: groupWidth, height: innerHeight, class: "chart-weekend"
     })));
+    if (options.selectedIndex !== undefined) svg.append(svgElement("rect", {
+      x: left + options.selectedIndex * groupWidth, y: top, width: groupWidth, height: innerHeight, class: "chart-selected"
+    }));
     if (weather) {
       const wetMaximum = Math.max(0, ...weather.map(item => item.precipitation ?? 0));
       if (wetMaximum > 0) weather.forEach((item, index) => {
@@ -152,6 +167,7 @@
         class: "chart-target", tabindex: "0", "aria-label": point.tooltip};
       if (options.onSelect) attributes.role = "button";
       const target = svgElement("rect", attributes);
+      if (index === options.selectedIndex) target.classList.add("selected");
       target.dataset.index = index;
       const title = svgElement("title"); title.textContent = point.tooltip; target.append(title);
       target.addEventListener("mouseenter", () => showTooltip(container, target, point.tooltip));
@@ -242,10 +258,11 @@
       points: history.map(item => ({tooltip: `${options.pointLabel(item)}\n${count(item.arrivals)} arrivals · ${count(item.departures)} departures\nNet ${item.netFlow > 0 ? "+" : ""}${count(item.netFlow)}`})),
       ticks: options.ticks,
       weekends: options.weekends || [],
+      selectedIndex: options.selectedIndex,
       onSelect: options.onSelect
     });
   }
 
-  root.StationProfile = {monthlyHistory, dailyHistory, seasonHistory, render, renderDay, renderFlowHistory};
-  if (typeof module !== "undefined") module.exports = {monthlyHistory, dailyHistory, seasonHistory};
+  root.StationProfile = {monthlyHistory, dailyHistory, timeAwareHistory, navigationSelection, seasonHistory, render, renderDay, renderFlowHistory};
+  if (typeof module !== "undefined") module.exports = {monthlyHistory, dailyHistory, timeAwareHistory, navigationSelection, seasonHistory};
 })(typeof globalThis !== "undefined" ? globalThis : this);

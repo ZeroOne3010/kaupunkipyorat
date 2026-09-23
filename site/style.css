@@ -119,6 +119,9 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .summary li button:hover, .summary li button:focus-visible { color: #006bb6; text-decoration: underline; }
 .summary li span { flex: none; font-weight: 750; }
 .summary .empty { color: #6b7e8e; list-style: none; margin-left: -22px; }
+.summary-chart-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid #d9e1e7; }
+.summary-chart-section > p { margin: 3px 0 2px; color: #526a7e; font-size: 11px; }
+.compact-chart .history-chart { min-height: 105px; }
 @media (max-width: 560px) {
   .panel { right: 8px; bottom: 8px; width: auto; left: 8px; padding: 9px 11px; }
   .panel.collapsed { right: 8px; width: auto; }
@@ -160,6 +163,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 [data-theme="dark"] .insight-details,
 [data-theme="dark"] .insights-unavailable,
 [data-theme="dark"] .profile-month,
+[data-theme="dark"] .summary-chart-section > p,
 [data-theme="dark"] .profile-chart-section > p,
 [data-theme="dark"] .chart-axis-label,
 [data-theme="dark"] .chart-value-label { color: #aebdca; fill: #aebdca; }
@@ -182,6 +186,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 [data-theme="dark"] .info-popup-content { box-shadow: 0 4px 18px #0009; }
 [data-theme="dark"] .ride-details,
 [data-theme="dark"] .weather-summary,
+[data-theme="dark"] .summary-chart-section,
 [data-theme="dark"] .app-footer,
 [data-theme="dark"] .profile-summary { border-color: #405364; }
 [data-theme="dark"] .ranking-row button,
@@ -272,6 +277,7 @@ select, input[type="number"] { box-sizing: border-box; min-height: 34px; border:
 .profile-chart { position: relative; width: 100%; }
 .history-chart { display: block; width: 100%; height: auto; min-height: 170px; overflow: visible; }
 .chart-weekend { fill: #edf3f7; }
+.chart-selected { fill: #1683cf20; stroke: #1683cf; stroke-width: 1.5; pointer-events: none; }
 .chart-baseline { stroke: #8193a2; stroke-width: 1.5; }
 .chart-bar { fill: #547fa1; }
 .chart-bar.arrivals, .chart-key.arrivals { fill: #2f9e72; background: #2f9e72; }
