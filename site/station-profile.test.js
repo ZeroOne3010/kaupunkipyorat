@@ -93,8 +93,11 @@ test("station profile charts remain alongside the main station history chart", (
 
 test("combined flow charts render net flow as a line series", () => {
   const source = fs.readFileSync(require.resolve("./station-profile.js"), "utf8");
+  const styles = fs.readFileSync(require.resolve("./style.css"), "utf8");
   assert.match(source, /className: "net", type: "line", values: values\("netFlow"\)/);
   assert.match(source, /class: `chart-line \$\{series\.className\}`/);
+  assert.match(styles, /\[data-theme="dark"\] \.chart-line\.net \{ stroke: #f3e8ff; \}/);
+  assert.match(styles, /\[data-theme="dark"\] \.chart-key\.net \{ background: #f3e8ff; \}/);
 });
 
 test("season history aggregates station flows into points exactly one week apart", () => {
