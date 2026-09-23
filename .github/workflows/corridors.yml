@@ -23,6 +23,11 @@ on:
         required: false
         default: ""
         type: string
+      sample_routes:
+        description: Optional evenly distributed diagnostic sample of routed OD records
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -46,16 +51,23 @@ jobs:
           TOLERANCE: ${{ inputs.tolerance_meters }}
           MINIMUM: ${{ inputs.minimum_trips }}
           MAX_ROUTES: ${{ inputs.max_routes }}
+          SAMPLE_ROUTES: ${{ inputs.sample_routes }}
         run: |
           [[ "$YEAR" =~ ^[0-9]{4}$ ]] || { echo "year must contain four digits" >&2; exit 1; }
           MAX_ROUTES_ARGUMENT=()
+          SAMPLE_ROUTES_ARGUMENT=()
           if [[ -n "$MAX_ROUTES" ]]; then
             [[ "$MAX_ROUTES" =~ ^[1-9][0-9]*$ ]] || { echo "max_routes must be empty or a positive integer" >&2; exit 1; }
             MAX_ROUTES_ARGUMENT=(--max-routes "$MAX_ROUTES")
           fi
+          if [[ -n "$SAMPLE_ROUTES" ]]; then
+            [[ "$SAMPLE_ROUTES" =~ ^[1-9][0-9]*$ ]] || { echo "sample_routes must be empty or a positive integer" >&2; exit 1; }
+            SAMPLE_ROUTES_ARGUMENT=(--sample-routes "$SAMPLE_ROUTES")
+          fi
+          [[ -z "$MAX_ROUTES" || -z "$SAMPLE_ROUTES" ]] || { echo "max_routes and sample_routes cannot both be supplied" >&2; exit 1; }
           python preprocess/build-corridors.py "$YEAR" \
             --tolerance-meters "$TOLERANCE" --minimum-trips "$MINIMUM" \
-            "${MAX_ROUTES_ARGUMENT[@]}" \
+            "${MAX_ROUTES_ARGUMENT[@]}" "${SAMPLE_ROUTES_ARGUMENT[@]}" \
             --output "output/$YEAR.json" --report "output/$YEAR-summary.txt"
       - name: Validate compact corridor JSON
         env:
