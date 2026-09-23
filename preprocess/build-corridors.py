@@ -125,7 +125,15 @@ def seasonal_trips(data_dir, year):
     return paths, dict(totals), excluded
 
 
-def load_routes(route_dir, trips, transformer, minimum_trips=1, max_routes=None):
+def evenly_sample(records, sample_size):
+    """Select an ordered, deterministic sample spanning all records."""
+    if sample_size >= len(records):
+        return records
+    return [records[index * len(records) // sample_size] for index in range(sample_size)]
+
+
+def load_routes(route_dir, trips, transformer, minimum_trips=1, max_routes=None,
+                sample_routes=None):
     records, missing = [], []
     files = {}
     for (origin, destination), count in sorted(trips.items()):
@@ -149,6 +157,8 @@ def load_routes(route_dir, trips, transformer, minimum_trips=1, max_routes=None)
         records.append({"od": (origin, destination), "weight": count, "line": metric})
         if max_routes is not None and len(records) >= max_routes:
             break
+    if sample_routes is not None:
+        records = evenly_sample(records, sample_routes)
     return records, missing
 
 
@@ -373,12 +383,16 @@ def main(argv=None):
     parser.add_argument("--report", type=Path)
     parser.add_argument("--tolerance-meters", type=float, default=4)
     parser.add_argument("--minimum-trips", type=int, default=1)
-    parser.add_argument("--max-routes", type=int,
-                        help="process only the first N routed OD records (diagnostic only)")
+    route_limit = parser.add_mutually_exclusive_group()
+    route_limit.add_argument("--max-routes", type=int,
+                             help="process only the first N routed OD records (diagnostic only)")
+    route_limit.add_argument("--sample-routes", type=int,
+                             help="evenly sample N routed OD records (diagnostic only)")
     args = parser.parse_args(argv)
     if (args.tolerance_meters <= 0 or args.minimum_trips < 1 or
-            args.max_routes is not None and args.max_routes < 1):
-        parser.error("tolerance, minimum trips, and max routes (when set) must be positive")
+            args.max_routes is not None and args.max_routes < 1 or
+            args.sample_routes is not None and args.sample_routes < 1):
+        parser.error("tolerance, minimum trips, and route limits (when set) must be positive")
     output = args.output or Path("site/corridors") / f"{args.year}.json"
     overall_start = time.perf_counter()
     phase_start = time.perf_counter()
@@ -390,7 +404,8 @@ def main(argv=None):
     forward = Transformer.from_crs(4326, 3067, always_xy=True)
     inverse = Transformer.from_crs(3067, 4326, always_xy=True)
     phase_start = time.perf_counter()
-    records, missing = load_routes(args.routes, trips, forward, args.minimum_trips, args.max_routes)
+    records, missing = load_routes(args.routes, trips, forward, args.minimum_trips,
+                                   args.max_routes, args.sample_routes)
     route_load_seconds = log_phase("loading/decoding/projecting route geometries", phase_start, overall_start)
     vertex_count = sum(len(record["line"].coords) for record in records)
     edge_count = sum(max(0, len(record["line"].coords) - 1) for record in records)
@@ -418,6 +433,7 @@ def main(argv=None):
              f"Trips below minimum trips: {sum(minimum_excluded):,}",
              f"Missing route geometries: {len(missing):,}", f"Input route geometries processed: {len(records):,}",
              f"Maximum routes diagnostic limit: {args.max_routes if args.max_routes is not None else 'unlimited'}",
+             f"Evenly sampled routes diagnostic limit: {args.sample_routes if args.sample_routes is not None else 'disabled'}",
              f"Decoded polyline vertices: {vertex_count:,}", f"Primitive polyline edges: {edge_count:,}",
              "Route length metres min / median / p90 / p95 / max: " + " / ".join(
                  f"{length_stats[key]:,.1f}" for key in ("min", "median", "p90", "p95", "max")),

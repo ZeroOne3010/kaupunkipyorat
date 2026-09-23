@@ -89,6 +89,27 @@ class BuildCorridorsTests(unittest.TestCase):
             self.assertEqual([record["od"] for record in limited], [(1, 2), (1, 3)])
             self.assertEqual([record["od"] for record in unlimited], [(1, 2), (1, 3), (2, 3)])
 
+    def test_even_sampling_is_deterministic_exact_and_ordered(self):
+        records = list(range(20))
+        expected = [0, 4, 8, 12, 16]
+        self.assertEqual(corridors.evenly_sample(records, 5), expected)
+        self.assertEqual(corridors.evenly_sample(records, 5), expected)
+        self.assertEqual(len(corridors.evenly_sample(records, 7)), 7)
+        self.assertEqual(corridors.evenly_sample(records, 7),
+                         sorted(corridors.evenly_sample(records, 7)))
+
+    def test_even_sampling_larger_than_available_returns_all(self):
+        records = list(range(4))
+        self.assertIs(corridors.evenly_sample(records, 10), records)
+
+    def test_no_route_limit_keeps_all_records(self):
+        records = list(range(12))
+        self.assertEqual(corridors.evenly_sample(records, len(records)), records)
+
+    def test_route_limit_options_are_mutually_exclusive(self):
+        with self.assertRaises(SystemExit):
+            corridors.main(["2025", "--max-routes", "2", "--sample-routes", "2"])
+
     def test_distribution_statistics(self):
         result = corridors.distribution([1, 2, 3, 4, 100])
         self.assertEqual(result["min"], 1)
