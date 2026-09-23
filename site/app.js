@@ -397,6 +397,7 @@ function update() {
     document.querySelector("#unique-origins").textContent = `${stationStats.uniqueOrigins.toLocaleString()} unique`;
     renderRanking("#top-outgoing", rankedConnections(tuples, true), stationStats.departures);
     renderRanking("#top-incoming", rankedConnections(tuples, false), stationStats.arrivals);
+    renderMainStationHistory();
     const rainSection = document.querySelector("#rain-sensitivity-summary");
     rainSection.hidden = coloring !== "weather";
     if (coloring === "weather") {
@@ -615,105 +616,88 @@ function hideStationProfile(restoreFocus = true) {
   if (restoreFocus && wasOpen && selectedId !== null) document.querySelector("#open-station-profile").focus();
 }
 
-function renderStationFlowProfile(mode, history, weather = null) {
-  const monthName = date => date.toLocaleDateString(undefined, {month: "short", day: "numeric", timeZone: "UTC"});
-  let options;
-  if (mode === "hour") options = {
-    title: "Activity by hour", label: "Arrivals, departures, and net flow by hour for the selected day",
-    pointLabel: item => `${String(item.hour).padStart(2, "0")}:00–${String((item.hour + 1) % 24).padStart(2, "0")}:00`,
-    ticks: [0, 4, 8, 12, 16, 20, 23].map(hour => [hour, String(hour).padStart(2, "0")]),
-    onSelect: index => stationProfileNavigate("hour", history[index].hour)
-  };
-  else if (mode === "day") options = {
-    title: "Activity by day", label: "Arrivals, departures, and net flow by day for the selected month",
-    pointLabel: item => monthName(new Date(Date.UTC(data.y, data.m - 1, item.day))),
+function flowChartOptions(mode, history, date, onSelect) {
+  if (mode === "month") return {
+    label: "Arrivals, departures, and net flow by day for the selected month",
+    pointLabel: item => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), item.day))
+      .toLocaleDateString(undefined, {weekday: "short", month: "short", day: "numeric", timeZone: "UTC"}),
     ticks: history.map((item, index) => [index, item.day]).filter(([index]) => index === 0 || (index + 1) % 5 === 0 || index === history.length - 1),
     weekends: history.flatMap((item, index) => item.isWeekend ? [index] : []),
-    onSelect: index => stationProfileNavigate("day", history[index].day)
+    onSelect: index => onSelect("day", history[index].day)
   };
-  else options = {
-    title: "Activity by week", label: "Weekly arrivals, departures, and net flow for the selected season",
-    pointLabel: item => `Week of ${monthName(item.date)}`,
-    ticks: history.map((item, index) => [index, monthName(item.date)]).filter(([index]) => index % 4 === 0 || index === history.length - 1)
+  return {
+    label: "Arrivals, departures, and net flow by hour for the selected day",
+    pointLabel: item => `${String(item.hour).padStart(2, "0")}:00–${String((item.hour + 1) % 24).padStart(2, "0")}:00`,
+    ticks: [0, 4, 8, 12, 16, 20, 23].map(hour => [hour, String(hour).padStart(2, "0")]),
+    selectedIndex: mode === "hour" ? date.getUTCHours() : undefined,
+    onSelect: index => onSelect("hour", history[index].hour)
   };
-  document.querySelector("#profile-chart-title").textContent = options.title;
-  const weatherEnabled = document.querySelector('input[name="profile-weather"]:checked').value === "on" && weather;
-  options.weather = weatherEnabled ? weather : null;
-  document.querySelector("#profile-daily-description").innerHTML = `<span class="chart-key arrivals"></span>Arrivals <span class="chart-key departures"></span>Departures <span class="chart-key net"></span>Net flow${mode === "day" ? ' · <span class="chart-key weekend"></span>Weekend' : ""}${weatherEnabled ? ' · <span class="chart-key precipitation"></span>Rain <span class="chart-key temperature"></span>Temperature' : ""}`;
-  StationProfile.renderFlowHistory(document.querySelector("#profile-daily-chart"), history, options);
 }
 
-async function loadSeasonHistory(year, stationId, selectedMonth, selectedMonthData) {
-  const key = `${year}-season:${stationId}`;
-  if (stationProfileCache.has(key)) return stationProfileCache.get(key);
-  const entries = [...availableMonths].filter(([value]) => value.startsWith(`${year}-`));
-  const months = await Promise.all(entries.map(async ([value, file]) => {
-    if (value === selectedMonth) return selectedMonthData;
-    try {
-      const response = await fetch(`data/${file}`);
-      return response.ok ? await response.json() : null;
-    } catch (_) {
-      return null;
-    }
-  }));
-  const history = StationProfile.seasonHistory(stationId, months.filter(Boolean));
-  if (months.every(Boolean)) stationProfileCache.set(key, history);
-  return history;
+function renderMainStationHistory() {
+  if (selectedId === null || !data || !selectedDate) return;
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  const history = StationProfile.timeAwareHistory(mode, selectedId, data, selectedDate);
+  document.querySelector("#station-history-title").textContent = mode === "month" ? "Activity by day" : "Activity by hour";
+  document.querySelector("#station-history-weekend-key").hidden = mode !== "month";
+  StationProfile.renderFlowHistory(document.querySelector("#station-history-chart"), history,
+    flowChartOptions(mode, history, selectedDate, stationProfileNavigate));
+}
+
+function renderMonthStationProfile(history, date, weather = null) {
+  const enabled = document.querySelector('input[name="profile-weather"]:checked').value === "on";
+  document.querySelector("#profile-daily-description").innerHTML = `Trips involving this station · <span class="chart-key weekend"></span>Weekend${enabled && weather ? ' · <span class="chart-key precipitation"></span>Rain <span class="chart-key temperature"></span>Temperature' : ""}`;
+  StationProfile.render({
+    daily: document.querySelector("#profile-daily-chart"),
+    hourly: document.querySelector("#profile-hourly-chart"),
+    net: document.querySelector("#profile-net-chart")
+  }, history, date, {
+    day: day => stationProfileNavigate("day", day),
+    hour: hour => stationProfileNavigate("hour", hour)
+  }, enabled ? weather : null);
 }
 
 function stationProfileNavigate(mode, value) {
   hideStationProfile(false);
   closeInsightVisualization();
-  if (mode === "day") selectedDate.setUTCDate(value);
-  else selectedDate.setUTCHours(value);
-  document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
+  const selection = StationProfile.navigationSelection(selectedDate, selectedId, mode, value);
+  selectedDate = selection.selectedDate;
+  selectedId = selection.selectedStationId;
+  document.querySelector(`input[name="mode"][value="${selection.mode}"]`).checked = true;
   update();
 }
 
-async function showStationProfile() {
+function showStationProfile() {
   if (selectedId === null || !data || !selectedDate) return;
   const requestId = ++stationProfileRequestId;
   const stationId = selectedId;
   const date = new Date(selectedDate);
-  const selectedMonth = monthKey(date);
-  const selectedMonthData = data;
-  const mode = document.querySelector('input[name="mode"]:checked').value;
-  const summaryPeriod = periodText();
+  const monthData = data;
   hideRankings(false);
   hideInsights();
-  const key = `${selectedMonth}:${stationId}`;
-  if (!stationProfileCache.has(key)) stationProfileCache.set(key, StationProfile.monthlyHistory(stationId, selectedMonthData));
+  const key = `${monthKey(date)}:${stationId}`;
+  if (!stationProfileCache.has(key)) stationProfileCache.set(key, StationProfile.monthlyHistory(stationId, monthData));
+  const history = stationProfileCache.get(key);
   const station = stationById.get(stationId);
-  const profileTuples = currentTuples();
-  const profileStatistics = StationSummary.aggregateStationStatistics(STATIONS, profileTuples);
+  const profileStatistics = StationSummary.aggregateStationStatistics(STATIONS, monthData.total || monthData.d.flat());
   const stats = StationSummary.summaryFromStatistics(profileStatistics.get(stationId));
   const rank = 1 + [...profileStatistics.values()].filter(item => item.trips > stats.trips).length;
   const directionalTotal = stats.arrivals + stats.departures;
-  const arrivalsShare = directionalTotal ? stats.arrivals / directionalTotal * 100 : 0;
-  const departuresShare = directionalTotal ? stats.departures / directionalTotal * 100 : 0;
   document.querySelector("#profile-station-name").textContent = station.name;
-  document.querySelector("#profile-month").textContent = summaryPeriod;
+  document.querySelector("#profile-month").textContent = date.toLocaleDateString(undefined, {month: "long", year: "numeric", timeZone: "UTC"});
   document.querySelector("#profile-summary").replaceChildren(...[
     `${stats.trips.toLocaleString()} trips · #${rank.toLocaleString()} busiest`,
-    `${arrivalsShare.toLocaleString(undefined, {maximumFractionDigits: 1})}% arrivals · ${departuresShare.toLocaleString(undefined, {maximumFractionDigits: 1})}% departures`,
+    `${(directionalTotal ? stats.arrivals / directionalTotal * 100 : 0).toLocaleString(undefined, {maximumFractionDigits: 1})}% arrivals · ${(directionalTotal ? stats.departures / directionalTotal * 100 : 0).toLocaleString(undefined, {maximumFractionDigits: 1})}% departures`,
     `${stats.roundTripPercentage.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}% round trips`
   ].map(text => { const row = document.createElement("p"); row.textContent = text; return row; }));
-  const history = mode === "hour" ? StationProfile.dailyHistory(stationId, selectedMonthData, date.getUTCDate())
-    : mode === "day" ? stationProfileCache.get(key).daily
-      : await loadSeasonHistory(date.getUTCFullYear(), stationId, selectedMonth, selectedMonthData);
-  if (requestId !== stationProfileRequestId || selectedId !== stationId || data !== selectedMonthData ||
-      selectedDate?.getTime() !== date.getTime() || document.querySelector('input[name="mode"]:checked').value !== mode) return;
-  const weatherControl = document.querySelector("#profile-weather-control");
-  weatherControl.hidden = mode === "month";
-  const context = `${stationId}:${mode}:${date.toISOString()}`;
+  const context = `${stationId}:${monthKey(date)}`;
   profileWeatherContext = context;
   profileWeather = null;
-  renderStationFlowProfile(mode, history);
-  if (mode !== "month") loadWeather(date.getUTCFullYear()).then(payload => {
-    if (profileWeatherContext !== context || !payload) return;
-    profileWeather = mode === "hour" ? Weather.hourlyWeatherForDay(payload, station.lon, date)
-      : Weather.dailyWeatherForMonth(payload, station.lon, date);
-    renderStationFlowProfile(mode, history, profileWeather);
+  renderMonthStationProfile(history, date);
+  loadWeather(date.getUTCFullYear()).then(payload => {
+    if (requestId !== stationProfileRequestId || profileWeatherContext !== context || !payload) return;
+    profileWeather = Weather.dailyWeatherForMonth(payload, station.lon, date);
+    renderMonthStationProfile(history, date, profileWeather);
   });
   document.querySelector("#station-profile").hidden = false;
   document.querySelector("#station-profile-backdrop").hidden = false;
@@ -723,10 +707,8 @@ async function showStationProfile() {
 document.querySelector("#open-station-profile").addEventListener("click", showStationProfile);
 document.querySelectorAll('input[name="profile-weather"]').forEach(input => input.addEventListener("change", () => {
   if (!profileWeatherContext || selectedId === null) return;
-  const mode = document.querySelector('input[name="mode"]:checked').value;
-  const history = mode === "hour" ? StationProfile.dailyHistory(selectedId, data, selectedDate.getUTCDate())
-    : stationProfileCache.get(`${monthKey(selectedDate)}:${selectedId}`).daily;
-  renderStationFlowProfile(mode, history, profileWeather);
+  const history = stationProfileCache.get(`${monthKey(selectedDate)}:${selectedId}`);
+  if (history) renderMonthStationProfile(history, new Date(selectedDate), profileWeather);
 }));
 document.querySelector("#close-station-profile").addEventListener("click", () => hideStationProfile());
 document.querySelector("#station-profile-backdrop").addEventListener("click", () => hideStationProfile());

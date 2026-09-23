@@ -35,6 +35,11 @@
         <section><h3>Top destinations</h3><p id="unique-destinations" class="unique-count">—</p><ol id="top-outgoing"></ol></section>
         <section><h3>Top origins</h3><p id="unique-origins" class="unique-count">—</p><ol id="top-incoming"></ol></section>
       </div>
+      <section id="station-history-section" class="summary-chart-section" aria-labelledby="station-history-title">
+        <h3 id="station-history-title">Activity by day</h3>
+        <p><span class="chart-key arrivals"></span>Arrivals <span class="chart-key departures"></span>Departures <span class="chart-key net"></span>Net flow <span id="station-history-weekend-key">· <span class="chart-key weekend"></span>Weekend</span></p>
+        <div id="station-history-chart" class="profile-chart compact-chart"></div>
+      </section>
     </div>
   </aside>
 
@@ -46,10 +51,20 @@
     </header>
     <p id="profile-month" class="profile-month">—</p>
     <div id="profile-summary" class="profile-summary"></div>
-    <section id="profile-daily-section" class="profile-chart-section">
-      <div id="profile-daily-heading" class="profile-chart-heading"><h3 id="profile-chart-title">Activity</h3><fieldset id="profile-weather-control" class="segments weather-control"><legend>Weather</legend><label><input type="radio" name="profile-weather" value="off" checked>Off</label><label><input type="radio" name="profile-weather" value="on">On</label></fieldset></div>
-      <p id="profile-daily-description"><span class="chart-key arrivals"></span>Arrivals <span class="chart-key departures"></span>Departures <span class="chart-key net"></span>Net flow</p>
+    <section class="profile-chart-section">
+      <div class="profile-chart-heading"><h3>Activity by day</h3><fieldset id="profile-weather-control" class="segments weather-control"><legend>Weather</legend><label><input type="radio" name="profile-weather" value="off" checked>Off</label><label><input type="radio" name="profile-weather" value="on">On</label></fieldset></div>
+      <p id="profile-daily-description">Trips involving this station · <span class="chart-key weekend"></span>Weekend</p>
       <div id="profile-daily-chart" class="profile-chart"></div>
+    </section>
+    <section class="profile-chart-section">
+      <h3>Typical day</h3>
+      <p>Average per day · <span class="chart-key arrivals"></span>Arrivals <span class="chart-key departures"></span>Departures</p>
+      <div id="profile-hourly-chart" class="profile-chart"></div>
+    </section>
+    <section class="profile-chart-section">
+      <h3>Net flow by day</h3>
+      <p>Arrivals minus departures · <span class="chart-key weekend"></span>Weekend</p>
+      <div id="profile-net-chart" class="profile-chart"></div>
     </section>
   </section>
 
