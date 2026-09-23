@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Build season-wide inferred cycling corridors from committed route geometry.
-
-Routes are kept as curved lines.  A route is split where the set of other routes
-within ``tolerance`` changes; each atomic piece is represented by the lowest
-stable route id which covers it.  This conflates reversed and differently
-vertexed lines without requiring equal vertices.  The tolerance is deliberately
-small: it is a geometric conflation allowance, not a sampling interval.
-"""
+"""Build season-wide cycling corridors from exact routed-polyline E5 edges."""
 
 import argparse
 import gzip
@@ -17,13 +10,14 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-try:
+try:  # Legacy geometric implementation, retained only for reference/tests.
     from pyproj import Transformer
     from shapely.geometry import LineString, Point
     from shapely.ops import linemerge, substring, unary_union
     from shapely.strtree import STRtree
-except ImportError as error:  # pragma: no cover - exercised by the CLI environment
-    raise SystemExit("build-corridors.py requires Shapely and pyproj") from error
+except ImportError:  # Production exact-edge builds do not need these packages.
+    Transformer = LineString = Point = STRtree = None
+    linemerge = substring = unary_union = None
 
 
 MONTHS = range(4, 11)
@@ -108,6 +102,20 @@ def encode_polyline(coordinates):
                 output.append(chr((32 | encoded & 31) + 63))
                 encoded >>= 5
             output.append(chr(encoded + 63))
+    return "".join(output)
+
+
+def encode_polyline_e5(coordinates):
+    """Encode integer (longitude E5, latitude E5) coordinates directly."""
+    output, previous_lon, previous_lat = [], 0, 0
+    for lon, lat in coordinates:
+        for delta in (lat - previous_lat, lon - previous_lon):
+            encoded = ~(delta << 1) if delta < 0 else delta << 1
+            while encoded >= 32:
+                output.append(chr((32 | encoded & 31) + 63))
+                encoded >>= 5
+            output.append(chr(encoded + 63))
+        previous_lon, previous_lat = lon, lat
     return "".join(output)
 
 
@@ -241,6 +249,83 @@ def build_exact_edges(records, diagnostics=None):
         },
     })
     return edges
+
+
+def merge_exact_edges(edges, diagnostics=None):
+    """Return deterministic maximal, non-branching chains grouped by exact weight."""
+    diagnostics = diagnostics if diagnostics is not None else {}
+    by_weight = defaultdict(list)
+    for entry in edges:
+        by_weight[int(entry["weight"])].append(tuple(entry["edge"]))
+
+    chains = []
+    for weight in sorted(by_weight):
+        weight_edges = sorted(set(by_weight[weight]))
+        adjacency = defaultdict(list)
+        for edge in weight_edges:
+            first, second = edge
+            adjacency[first].append((second, edge))
+            adjacency[second].append((first, edge))
+        for vertex in adjacency:
+            adjacency[vertex].sort()
+        unused = set(weight_edges)
+
+        def walk(start, edge):
+            vertices, current, selected = [start], start, edge
+            while selected in unused:
+                unused.remove(selected)
+                following = selected[1] if selected[0] == current else selected[0]
+                vertices.append(following)
+                if len(adjacency[following]) != 2:
+                    break
+                candidates = [candidate for _other, candidate in adjacency[following]
+                              if candidate in unused]
+                if len(candidates) != 1:
+                    break
+                current, selected = following, candidates[0]
+            canonical = tuple(vertices)
+            reverse = tuple(reversed(canonical))
+            return min(canonical, reverse)
+
+        # Paths touching endpoints or branches come first. A degree-two vertex
+        # can be crossed only when there is exactly one unused continuation.
+        for vertex in sorted(adjacency):
+            if len(adjacency[vertex]) == 2:
+                continue
+            for _other, edge in adjacency[vertex]:
+                if edge in unused:
+                    chains.append((walk(vertex, edge), weight))
+        # Every remaining component is a cycle. Starting with its smallest
+        # edge/endpoint makes cycle cutting and orientation byte-stable.
+        while unused:
+            edge = min(unused)
+            chains.append((walk(min(edge), edge), weight))
+
+    chains.sort(key=lambda item: (-item[1], item[0]))
+    edge_counts = [len(vertices) - 1 for vertices, _weight in chains]
+    vertex_counts = [len(vertices) for vertices, _weight in chains]
+    absorbed = sum(count for count in edge_counts if count > 1)
+    diagnostics.update({
+        "unique_exact_weighted_edges_before_merging": len(edges),
+        "merged_corridor_polylines": len(chains),
+        "edges_absorbed_into_multi_edge_chains": absorbed,
+        "edges_absorbed_percentage": absorbed / len(edges) * 100 if edges else 0,
+        "chain_edge_count_distribution": distribution(edge_counts),
+        "chain_vertex_count_distribution": distribution(vertex_counts),
+    })
+    return chains
+
+
+def exact_output_payload(year, chains):
+    """Encode exact E5 chains using the established compact corridor schema."""
+    rows = []
+    for coordinates, weight in chains:
+        forward = encode_polyline_e5(coordinates)
+        reverse = encode_polyline_e5(reversed(coordinates))
+        rows.append([min(forward, reverse), int(weight)])
+    rows.sort(key=lambda row: (-row[1], row[0]))
+    return {"v": 1, "year": year, "from": f"{year}-04", "to": f"{year}-10",
+            "corridors": rows}
 
 
 def _line_parts(geometry):
@@ -493,7 +578,6 @@ def main(argv=None):
                         help="measure exact E5 primitive-edge collapse and skip corridor output")
     parser.add_argument("--exact-edges-summary", type=Path,
                         help="compact JSON statistics destination for --exact-edges-only")
-    parser.add_argument("--tolerance-meters", type=float, default=4)
     parser.add_argument("--minimum-trips", type=int, default=1)
     route_limit = parser.add_mutually_exclusive_group()
     route_limit.add_argument("--max-routes", type=int,
@@ -501,10 +585,10 @@ def main(argv=None):
     route_limit.add_argument("--sample-routes", type=int,
                              help="evenly sample N routed OD records (diagnostic only)")
     args = parser.parse_args(argv)
-    if (args.tolerance_meters <= 0 or args.minimum_trips < 1 or
+    if (args.minimum_trips < 1 or
             args.max_routes is not None and args.max_routes < 1 or
             args.sample_routes is not None and args.sample_routes < 1):
-        parser.error("tolerance, minimum trips, and route limits (when set) must be positive")
+        parser.error("minimum trips and route limits (when set) must be positive")
     output = args.output or Path("site/corridors") / f"{args.year}.json"
     overall_start = time.perf_counter()
     phase_start = time.perf_counter()
@@ -513,18 +597,12 @@ def main(argv=None):
     except (OSError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
     seasonal_seconds = log_phase("loading seasonal OD totals", phase_start, overall_start)
-    forward = Transformer.from_crs(4326, 3067, always_xy=True)
-    inverse = Transformer.from_crs(3067, 4326, always_xy=True)
     phase_start = time.perf_counter()
-    records, missing = load_routes(args.routes, trips, forward, args.minimum_trips,
-                                   args.max_routes, args.sample_routes,
-                                   project=not args.exact_edges_only)
-    loading_label = ("loading/decoding route geometries" if args.exact_edges_only else
-                     "loading/decoding/projecting route geometries")
-    route_load_seconds = log_phase(loading_label, phase_start, overall_start)
+    records, missing = load_routes(args.routes, trips, None, args.minimum_trips,
+                                   args.max_routes, args.sample_routes, project=False)
+    route_load_seconds = log_phase("loading/decoding route geometries", phase_start, overall_start)
     vertex_count = sum(len(record["coordinates_e5"]) for record in records)
     edge_count = sum(max(0, len(record["coordinates_e5"]) - 1) for record in records)
-    route_lengths = [record["line"].length for record in records if "line" in record]
     print(f"Build workload: {len(records):,} routed OD geometries, {vertex_count:,} vertices, "
           f"{edge_count:,} primitive edges; {sum(count < args.minimum_trips for count in trips.values()):,} "
           f"OD pairs excluded by minimum trips", flush=True)
@@ -542,18 +620,22 @@ def main(argv=None):
         print(f"Exact-edge summary written to {summary}", flush=True)
         return 0
     diagnostics = {}
-    corridors, before = aggregate_corridors(records, args.tolerance_meters, diagnostics, overall_start)
     phase_start = time.perf_counter()
-    payload = output_payload(args.year, args.tolerance_meters, corridors, inverse)
+    exact_edges = build_exact_edges(records, diagnostics)
+    exact_seconds = time.perf_counter() - phase_start
+    phase_start = time.perf_counter()
+    chains = merge_exact_edges(exact_edges, diagnostics)
+    merge_seconds = log_phase("constructing graph / merging exact edges", phase_start, overall_start)
+    phase_start = time.perf_counter()
+    payload = exact_output_payload(args.year, chains)
     encoded = (json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(encoded)
     output_seconds = log_phase("encoding/writing the final output", phase_start, overall_start)
     weights = sorted(row[1] for row in payload["corridors"])
     minimum_excluded = [count for count in trips.values() if count < args.minimum_trips]
-    candidate_stats = distribution(diagnostics.get("candidate_counts", []))
-    piece_stats = distribution(diagnostics.get("pieces_per_route", []))
-    length_stats = distribution(route_lengths)
+    edge_stats = diagnostics["chain_edge_count_distribution"]
+    vertex_stats = diagnostics["chain_vertex_count_distribution"]
     lines = [f"Year: {args.year}", "Monthly files: " + ", ".join(path.name for path in paths),
              f"Directed OD pairs with trips: {len(trips):,}", f"Seasonal trips in OD pairs: {sum(trips.values()):,}",
              f"Same-station OD rows excluded: {excluded:,}", f"Routed OD pairs found: {len(records):,}",
@@ -563,27 +645,14 @@ def main(argv=None):
              f"Maximum routes diagnostic limit: {args.max_routes if args.max_routes is not None else 'unlimited'}",
              f"Evenly sampled routes diagnostic limit: {args.sample_routes if args.sample_routes is not None else 'disabled'}",
              f"Decoded polyline vertices: {vertex_count:,}", f"Primitive polyline edges: {edge_count:,}",
-             "Route length metres min / median / p90 / p95 / max: " + " / ".join(
-                 f"{length_stats[key]:,.1f}" for key in ("min", "median", "p90", "p95", "max")),
-             "STRtree candidates per route min / median / mean / p90 / p95 / p99 / max: " + " / ".join(
-                 f"{candidate_stats[key]:,.1f}" for key in ("min", "median", "mean", "p90", "p95", "p99", "max")),
-             f"Total candidate route pairs examined: {diagnostics.get('candidate_pairs', 0):,}",
-             f"Candidate route pairs excluding self: {diagnostics.get('candidate_pairs_excluding_self', 0):,}",
-             f"Buffer/intersection comparisons: {diagnostics.get('buffer_intersection_comparisons', 0):,}",
-             f"Total split positions generated: {diagnostics.get('split_positions', 0):,}",
-             f"Total atomic pieces generated: {diagnostics.get('atomic_pieces', 0):,}",
-             "Atomic pieces per source route median / p90 / p95 / max: " + " / ".join(
-                 f"{piece_stats[key]:,.1f}" for key in ("median", "p90", "p95", "max")),
-             f"Parallel coverage calls: {diagnostics.get('coverage_calls', 0):,}",
-             f"Parallel coverage calls (covering sets): {diagnostics.get('coverage_calls_covering', 0):,}",
-             f"Parallel coverage calls (representative deduplication): {diagnostics.get('coverage_calls_dedup', 0):,}",
-             f"Parallel coverage cumulative time: {format_duration(diagnostics.get('coverage_seconds', 0))}",
-             f"Corridor pieces before merging: {before:,}", f"Corridor pieces after merging: {len(weights):,}"]
-    largest = sorted(zip(diagnostics.get("candidate_counts", []), records),
-                     key=lambda item: (-item[0], item[1]["od"]))[:10]
-    lines.append("Largest STRtree candidate sets:")
-    lines.extend(f"  {record['od'][0]} -> {record['od'][1]}: {count:,} candidates"
-                 for count, record in largest)
+             f"Unique exact weighted edges before merging: {len(exact_edges):,}",
+             f"Merged corridor polylines after merging: {len(chains):,}",
+             f"Edges absorbed into multi-edge chains: {diagnostics['edges_absorbed_into_multi_edge_chains']:,} "
+             f"({diagnostics['edges_absorbed_percentage']:.1f}%)",
+             "Chain edge-count min / median / p90 / p95 / max: " + " / ".join(
+                 f"{edge_stats[key]:,.1f}" for key in ("min", "median", "p90", "p95", "max")),
+             "Chain vertex-count min / median / p90 / p95 / max: " + " / ".join(
+                 f"{vertex_stats[key]:,.1f}" for key in ("min", "median", "p90", "p95", "max"))]
     if weights:
         lines.append("Corridor trips min / median / p90 / p95 / max: " + " / ".join(map(lambda n: f"{n:,}",
             [weights[0], round(statistics.median(weights)), percentile(weights, .9), percentile(weights, .95), weights[-1]])))
@@ -592,12 +661,11 @@ def main(argv=None):
     lines += [f"Output file size: {len(encoded):,} bytes", f"Estimated gzip size: {len(gzip.compress(encoded)):,} bytes",
               "Phase timings (seconds): " + ", ".join([
                   f"seasonal totals={seasonal_seconds:.3f}", f"route loading={route_load_seconds:.3f}",
-                  f"STRtree={diagnostics.get('strtree_seconds', 0):.3f}",
-                  f"candidate discovery={diagnostics.get('candidate_seconds', 0):.3f}",
-                  f"atomic building={diagnostics.get('atomic_build_seconds', 0):.3f}",
-                  f"coverage={diagnostics.get('covering_seconds', 0):.3f}",
-                  f"deduplication={diagnostics.get('dedup_seconds', 0):.3f}",
-                  f"merge={diagnostics.get('merge_seconds', 0):.3f}", f"output={output_seconds:.3f}"]),
+                  f"primitive-edge extraction={diagnostics['primitive_edge_extraction_seconds']:.3f}",
+                  f"exact aggregation={diagnostics['exact_edge_aggregation_seconds']:.3f}",
+                  f"exact collapse total={exact_seconds:.3f}",
+                  f"graph construction / merging={merge_seconds:.3f}",
+                  f"encoding/output={output_seconds:.3f}"]),
               f"Total runtime: {format_duration(time.perf_counter() - overall_start)}"]
     report = "\n".join(lines) + "\n"
     print(report, end="", flush=True)

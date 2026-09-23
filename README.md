@@ -128,12 +128,10 @@ same full-season corridor layer, labelled `Apr–Oct YYYY`.
 
 All expensive processing is offline. The browser fetches and caches only
 `site/corridors/YYYY.json`; it never combines the individual route files. Build a
-season locally with Python 3 plus [Shapely](https://shapely.readthedocs.io/) and
-[pyproj](https://pyproj4.github.io/pyproj/):
+season locally with Python 3:
 
 ```sh
-python -m pip install shapely pyproj
-python preprocess/build-corridors.py 2025 --tolerance-meters 4 \
+python preprocess/build-corridors.py 2025 \
   --output site/corridors/2025.json
 ```
 
@@ -142,34 +140,30 @@ The command requires all seven `site/data/YYYY-04.json` through
 `site/routes/<originStationId>.json`; it makes no network requests. Missing
 directed routes are reported and skipped rather than replaced by straight lines.
 The manual **Build estimated cycling corridors** workflow exposes year,
-conflation tolerance, and minimum-trip inputs, validates the result, and uploads
-the JSON and diagnostic report as an artifact. It never commits or pushes files.
+minimum-trip, and optional diagnostic route-limit inputs, validates the result,
+and uploads the JSON and diagnostic report as an artifact. It never commits or
+pushes files.
 
 The compact, non-GeoJSON schema is:
 
 ```json
-{"v":1,"year":2025,"from":"2025-04","to":"2025-10","toleranceMeters":4,"corridors":[["encodedGooglePolyline",18420]]}
+{"v":1,"year":2025,"from":"2025-04","to":"2025-10","corridors":[["encodedGooglePolyline",18420]]}
 ```
 
 Each tuple contains an encoded Google polyline and its exact estimated seasonal
-trip count. Route curves and original vertices are retained. In EPSG:3067,
-buffer-overlap boundaries split each route where its set of nearby routes
-changes; reversed lines and lines with different vertex spacing can therefore
-share a corridor without a resampling grid. The default four-metre tolerance is
-a geometric conflation allowance. Nearby pieces must also cover one another
-along their length with local headings within 30 degrees, so perpendicular
-crossings are not treated as shared corridors. A representative suppresses a
-duplicate only when both pieces have the same complete route-membership set;
-this preserves demand where proximity is non-transitive. Adjacent equal-weight
-pieces are merged only through unambiguous line continuations.
+trip count. The builder decodes every route to its original integer E5 vertices,
+collapses identical undirected primitive edges, and sums the weights of the OD
+routes using each edge. Adjacent edges with exactly the same weight are merged
+only through unambiguous, non-branching continuations. Original vertices are
+retained without projection, snapping, resampling, or simplification. Matching
+is exact: nearby lines or lines with different vertex spacing remain separate.
 
-Known limitations are inherent to route inference and conflation: Digitransit's
-shortest route need not be a rider's chosen route; routing data can change over
-time; missing routes reduce represented demand; and lines closer than the chosen
-tolerance can be conflated even when they are distinct facilities. Conversely,
-larger offsets can keep two representations of the same physical corridor
-separate. Corridor totals describe inferred route usage, not measured counts at
-a location.
+Known limitations are inherent to route inference and exact matching:
+Digitransit's shortest route need not be a rider's chosen route; routing data can
+change over time; missing routes reduce represented demand; and slightly
+different representations of the same physical corridor remain separate unless
+their E5 primitive edges are identical. Corridor totals describe inferred route
+usage, not measured counts at a location.
 
 ## Historical weather
 

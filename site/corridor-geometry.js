@@ -13,7 +13,7 @@
         if (coordinates.length > 1) features.push({type: "Feature", properties: {trips: row[1]}, geometry: {type: "LineString", coordinates}});
       } catch (_) { /* Ignore a malformed individual line, not the whole season. */ }
     }
-    return {year, from: payload.from, to: payload.to, toleranceMeters: payload.toleranceMeters,
+    return {year, from: payload.from, to: payload.to,
       geojson: {type: "FeatureCollection", features}};
   }
 

@@ -3,8 +3,8 @@ const test = require("node:test");
 const CorridorGeometry = require("./corridor-geometry.js");
 const RouteGeometry = require("./route-geometry.js");
 
-test("parses compact corridors with the shared Google decoder", () => {
-  const result = CorridorGeometry.parse({v: 1, year: 2025, from: "2025-04", to: "2025-10", toleranceMeters: 4,
+test("parses compact corridors without a geometric tolerance", () => {
+  const result = CorridorGeometry.parse({v: 1, year: 2025, from: "2025-04", to: "2025-10",
     corridors: [["??_ibE?", 18420]]}, 2025, RouteGeometry.decodePolyline);
   assert.equal(result.geojson.features[0].properties.trips, 18420);
   assert.deepEqual(result.geojson.features[0].geometry.coordinates, [[0, 0], [0, 1]]);

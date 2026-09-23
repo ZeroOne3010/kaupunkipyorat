@@ -8,11 +8,6 @@ on:
         required: true
         default: "2025"
         type: string
-      tolerance_meters:
-        description: Maximum geometric conflation distance in metres
-        required: true
-        default: "4"
-        type: string
       minimum_trips:
         description: Minimum seasonal trips for an OD route
         required: true
@@ -46,14 +41,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install geometry dependencies
-        run: python -m pip install --disable-pip-version-check shapely pyproj
       - name: Test corridor preprocessing
         run: python -m unittest preprocess/test_build_corridors.py
       - name: Build inferred season corridors
         env:
           YEAR: ${{ inputs.year }}
-          TOLERANCE: ${{ inputs.tolerance_meters }}
           MINIMUM: ${{ inputs.minimum_trips }}
           MAX_ROUTES: ${{ inputs.max_routes }}
           SAMPLE_ROUTES: ${{ inputs.sample_routes }}
@@ -76,7 +68,7 @@ jobs:
             EXACT_EDGES_ARGUMENT=(--exact-edges-only --exact-edges-summary "output/$YEAR-exact-edges-summary.json")
           fi
           python preprocess/build-corridors.py "$YEAR" \
-            --tolerance-meters "$TOLERANCE" --minimum-trips "$MINIMUM" \
+            --minimum-trips "$MINIMUM" \
             "${MAX_ROUTES_ARGUMENT[@]}" "${SAMPLE_ROUTES_ARGUMENT[@]}" \
             "${EXACT_EDGES_ARGUMENT[@]}" \
             --output "output/$YEAR.json" --report "output/$YEAR-summary.txt"
