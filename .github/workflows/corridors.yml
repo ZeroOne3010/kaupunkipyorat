@@ -28,6 +28,11 @@ on:
         required: false
         default: ""
         type: string
+      exact_edges_only:
+        description: Only measure exact primitive-edge collapse (no corridor JSON)
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -52,10 +57,12 @@ jobs:
           MINIMUM: ${{ inputs.minimum_trips }}
           MAX_ROUTES: ${{ inputs.max_routes }}
           SAMPLE_ROUTES: ${{ inputs.sample_routes }}
+          EXACT_EDGES_ONLY: ${{ inputs.exact_edges_only }}
         run: |
           [[ "$YEAR" =~ ^[0-9]{4}$ ]] || { echo "year must contain four digits" >&2; exit 1; }
           MAX_ROUTES_ARGUMENT=()
           SAMPLE_ROUTES_ARGUMENT=()
+          EXACT_EDGES_ARGUMENT=()
           if [[ -n "$MAX_ROUTES" ]]; then
             [[ "$MAX_ROUTES" =~ ^[1-9][0-9]*$ ]] || { echo "max_routes must be empty or a positive integer" >&2; exit 1; }
             MAX_ROUTES_ARGUMENT=(--max-routes "$MAX_ROUTES")
@@ -65,11 +72,16 @@ jobs:
             SAMPLE_ROUTES_ARGUMENT=(--sample-routes "$SAMPLE_ROUTES")
           fi
           [[ -z "$MAX_ROUTES" || -z "$SAMPLE_ROUTES" ]] || { echo "max_routes and sample_routes cannot both be supplied" >&2; exit 1; }
+          if [[ "$EXACT_EDGES_ONLY" == "true" ]]; then
+            EXACT_EDGES_ARGUMENT=(--exact-edges-only --exact-edges-summary "output/$YEAR-exact-edges-summary.json")
+          fi
           python preprocess/build-corridors.py "$YEAR" \
             --tolerance-meters "$TOLERANCE" --minimum-trips "$MINIMUM" \
             "${MAX_ROUTES_ARGUMENT[@]}" "${SAMPLE_ROUTES_ARGUMENT[@]}" \
+            "${EXACT_EDGES_ARGUMENT[@]}" \
             --output "output/$YEAR.json" --report "output/$YEAR-summary.txt"
       - name: Validate compact corridor JSON
+        if: ${{ !inputs.exact_edges_only }}
         env:
           YEAR: ${{ inputs.year }}
         run: |
@@ -89,4 +101,5 @@ jobs:
           path: |
             output/${{ inputs.year }}.json
             output/${{ inputs.year }}-summary.txt
+            output/${{ inputs.year }}-exact-edges-summary.json
           if-no-files-found: error

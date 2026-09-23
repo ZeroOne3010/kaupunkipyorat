@@ -67,6 +67,11 @@ def log_phase(label, started, overall_start):
 
 def decode_polyline(encoded):
     """Decode a Google polyline to (longitude, latitude) coordinates."""
+    return [(lon / 1e5, lat / 1e5) for lon, lat in decode_polyline_e5(encoded)]
+
+
+def decode_polyline_e5(encoded):
+    """Decode a Google polyline without losing its exact integer E5 vertices."""
     result, lat, lon, index = [], 0, 0, 0
     while index < len(encoded):
         deltas = []
@@ -86,7 +91,7 @@ def decode_polyline(encoded):
             deltas.append(~(value >> 1) if value & 1 else value >> 1)
         lat += deltas[0]
         lon += deltas[1]
-        result.append((lon / 1e5, lat / 1e5))
+        result.append((lon, lat))
     return result
 
 
@@ -133,12 +138,15 @@ def evenly_sample(records, sample_size):
 
 
 def load_routes(route_dir, trips, transformer, minimum_trips=1, max_routes=None,
-                sample_routes=None):
+                sample_routes=None, project=True):
     records, missing = [], []
     files = {}
-    for (origin, destination), count in sorted(trips.items()):
-        if count < minimum_trips:
-            continue
+    eligible = [(od, count) for od, count in sorted(trips.items()) if count >= minimum_trips]
+    # Select the diagnostic sample before route files are opened and, critically,
+    # before any polyline is decoded or projected.
+    if sample_routes is not None:
+        eligible = evenly_sample(eligible, sample_routes)
+    for (origin, destination), count in eligible:
         if origin not in files:
             path = route_dir / f"{origin}.json"
             try:
@@ -147,19 +155,85 @@ def load_routes(route_dir, trips, transformer, minimum_trips=1, max_routes=None,
                 files[origin] = {}
         route = files[origin].get(str(destination))
         try:
-            coordinates = decode_polyline(route["p"])
-            metric = LineString([transformer.transform(lon, lat) for lon, lat in coordinates])
-            if len(coordinates) < 2 or metric.length == 0:
+            coordinates_e5 = decode_polyline_e5(route["p"])
+            if len(coordinates_e5) < 2 or len(set(coordinates_e5)) < 2:
                 raise ValueError("empty line")
+            metric = None
+            if project:
+                coordinates = [(lon / 1e5, lat / 1e5) for lon, lat in coordinates_e5]
+                metric = LineString([transformer.transform(lon, lat) for lon, lat in coordinates])
+                if metric.length == 0:
+                    raise ValueError("empty line")
         except (KeyError, TypeError, ValueError):
             missing.append((origin, destination))
             continue
-        records.append({"od": (origin, destination), "weight": count, "line": metric})
+        record = {"od": (origin, destination), "weight": count,
+                  "coordinates_e5": coordinates_e5}
+        if metric is not None:
+            record["line"] = metric
+        records.append(record)
         if max_routes is not None and len(records) >= max_routes:
             break
-    if sample_routes is not None:
-        records = evenly_sample(records, sample_routes)
     return records, missing
+
+
+def primitive_edges(coordinates_e5):
+    """Yield canonical undirected, non-zero primitive edges in route order."""
+    for first, second in zip(coordinates_e5, coordinates_e5[1:]):
+        if first != second:
+            yield (first, second) if first < second else (second, first)
+
+
+def build_exact_edges(records, diagnostics=None):
+    """Collapse exact E5 primitive edges and add each route's weight once."""
+    diagnostics = diagnostics if diagnostics is not None else {}
+    extraction_started = time.perf_counter()
+    occurrences = zero_length = repeated = vertices = 0
+    extracted = []
+    for record in records:
+        coordinates = record["coordinates_e5"]
+        vertices += len(coordinates)
+        occurrences += max(0, len(coordinates) - 1)
+        route_edges = set()
+        for first, second in zip(coordinates, coordinates[1:]):
+            if first == second:
+                zero_length += 1
+                continue
+            edge = (first, second) if first < second else (second, first)
+            if edge in route_edges:
+                repeated += 1
+            else:
+                route_edges.add(edge)
+        extracted.append((route_edges, int(record["weight"])))
+    extraction_seconds = time.perf_counter() - extraction_started
+
+    aggregation_started = time.perf_counter()
+    aggregated = {}
+    for route_edges, weight in extracted:
+        for edge in route_edges:
+            entry = aggregated.setdefault(edge, {"edge": edge, "weight": 0, "route_count": 0})
+            entry["weight"] += weight
+            entry["route_count"] += 1
+    aggregation_seconds = time.perf_counter() - aggregation_started
+    edges = [aggregated[key] for key in sorted(aggregated)]
+    diagnostics.update({
+        "routed_od_geometries": len(records), "decoded_polyline_vertices": vertices,
+        "primitive_edge_occurrences": occurrences, "zero_length_edges_skipped": zero_length,
+        "repeated_edges_deduplicated": repeated, "unique_exact_edges": len(edges),
+        "exact_collapse_ratio": occurrences / len(edges) if edges else 0,
+        "primitive_edge_extraction_seconds": extraction_seconds,
+        "exact_edge_aggregation_seconds": aggregation_seconds,
+        "total_seasonal_trip_weight_represented": sum(edge["weight"] for edge in edges),
+        "edge_trip_count_distribution": distribution([edge["weight"] for edge in edges]),
+        "unique_edges_by_route_count": {
+            "exactly_1": sum(edge["route_count"] == 1 for edge in edges),
+            "2_plus": sum(edge["route_count"] >= 2 for edge in edges),
+            "5_plus": sum(edge["route_count"] >= 5 for edge in edges),
+            "10_plus": sum(edge["route_count"] >= 10 for edge in edges),
+            "50_plus": sum(edge["route_count"] >= 50 for edge in edges),
+        },
+    })
+    return edges
 
 
 def _line_parts(geometry):
@@ -374,6 +448,31 @@ def percentile(values, fraction):
     return values[min(len(values) - 1, round((len(values) - 1) * fraction))] if values else 0
 
 
+def exact_edges_report(diagnostics, route_load_seconds):
+    """Render the compact exact-collapse diagnostics used by the CLI and CI."""
+    usage = diagnostics["unique_edges_by_route_count"]
+    weights = diagnostics["edge_trip_count_distribution"]
+    return "\n".join([
+        f"Routed OD geometries processed: {diagnostics['routed_od_geometries']:,}",
+        f"Decoded polyline vertices: {diagnostics['decoded_polyline_vertices']:,}",
+        f"Primitive edge occurrences: {diagnostics['primitive_edge_occurrences']:,}",
+        f"Zero-length edges skipped: {diagnostics['zero_length_edges_skipped']:,}",
+        f"Repeated edges deduplicated within OD routes: {diagnostics['repeated_edges_deduplicated']:,}",
+        f"Unique exact undirected edges: {diagnostics['unique_exact_edges']:,}",
+        f"Exact-collapse ratio: {diagnostics['exact_collapse_ratio']:.3f}",
+        "Unique edges used by exactly 1 / 2+ / 5+ / 10+ / 50+ OD routes: " +
+        " / ".join(f"{usage[key]:,}" for key in ("exactly_1", "2_plus", "5_plus", "10_plus", "50_plus")),
+        f"Total seasonal trip weight represented: {diagnostics['total_seasonal_trip_weight_represented']:,}",
+        "Edge trip-count min / median / p90 / p95 / p99 / max: " +
+        " / ".join(f"{weights[key]:,.1f}" for key in ("min", "median", "p90", "p95", "p99", "max")),
+        "Phase timings (seconds): " + ", ".join([
+            f"route loading={route_load_seconds:.3f}",
+            f"primitive-edge extraction={diagnostics['primitive_edge_extraction_seconds']:.3f}",
+            f"exact-edge aggregation={diagnostics['exact_edge_aggregation_seconds']:.3f}",
+        ]),
+    ]) + "\n"
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("year", type=int)
@@ -381,6 +480,10 @@ def main(argv=None):
     parser.add_argument("--routes", type=Path, default=Path("site/routes"))
     parser.add_argument("--output", type=Path)
     parser.add_argument("--report", type=Path)
+    parser.add_argument("--exact-edges-only", action="store_true",
+                        help="measure exact E5 primitive-edge collapse and skip corridor output")
+    parser.add_argument("--exact-edges-summary", type=Path,
+                        help="compact JSON statistics destination for --exact-edges-only")
     parser.add_argument("--tolerance-meters", type=float, default=4)
     parser.add_argument("--minimum-trips", type=int, default=1)
     route_limit = parser.add_mutually_exclusive_group()
@@ -405,14 +508,30 @@ def main(argv=None):
     inverse = Transformer.from_crs(3067, 4326, always_xy=True)
     phase_start = time.perf_counter()
     records, missing = load_routes(args.routes, trips, forward, args.minimum_trips,
-                                   args.max_routes, args.sample_routes)
-    route_load_seconds = log_phase("loading/decoding/projecting route geometries", phase_start, overall_start)
-    vertex_count = sum(len(record["line"].coords) for record in records)
-    edge_count = sum(max(0, len(record["line"].coords) - 1) for record in records)
-    route_lengths = [record["line"].length for record in records]
+                                   args.max_routes, args.sample_routes,
+                                   project=not args.exact_edges_only)
+    loading_label = ("loading/decoding route geometries" if args.exact_edges_only else
+                     "loading/decoding/projecting route geometries")
+    route_load_seconds = log_phase(loading_label, phase_start, overall_start)
+    vertex_count = sum(len(record["coordinates_e5"]) for record in records)
+    edge_count = sum(max(0, len(record["coordinates_e5"]) - 1) for record in records)
+    route_lengths = [record["line"].length for record in records if "line" in record]
     print(f"Build workload: {len(records):,} routed OD geometries, {vertex_count:,} vertices, "
           f"{edge_count:,} primitive edges; {sum(count < args.minimum_trips for count in trips.values()):,} "
           f"OD pairs excluded by minimum trips", flush=True)
+    if args.exact_edges_only:
+        diagnostics = {}
+        build_exact_edges(records, diagnostics)
+        report = exact_edges_report(diagnostics, route_load_seconds)
+        print(report, end="", flush=True)
+        if args.report:
+            args.report.parent.mkdir(parents=True, exist_ok=True)
+            args.report.write_text(report, encoding="utf-8")
+        summary = args.exact_edges_summary or Path("output") / f"{args.year}-exact-edges-summary.json"
+        summary.parent.mkdir(parents=True, exist_ok=True)
+        summary.write_text(json.dumps({"year": args.year, **diagnostics}, indent=2) + "\n", encoding="utf-8")
+        print(f"Exact-edge summary written to {summary}", flush=True)
+        return 0
     diagnostics = {}
     corridors, before = aggregate_corridors(records, args.tolerance_meters, diagnostics, overall_start)
     phase_start = time.perf_counter()
