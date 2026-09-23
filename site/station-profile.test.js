@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {monthlyHistory, dailyHistory} = require("./station-profile.js");
+const {monthlyHistory, dailyHistory, seasonHistory} = require("./station-profile.js");
 
 test("monthly history includes every day and all hours with shared station semantics", () => {
   const d = Array.from({length: 31}, () => []);
@@ -48,7 +48,25 @@ test("daily history keeps all 24 local-hour buckets aligned", () => {
   h[26] = [[1, 2, 7]];
   const history = dailyHistory(1, {h}, 2);
   assert.equal(history.length, 24);
-  assert.deepEqual(history[0], {hour: 0, arrivals: 8, departures: 6});
-  assert.deepEqual(history[1], {hour: 1, arrivals: 0, departures: 0});
-  assert.deepEqual(history[2], {hour: 2, arrivals: 0, departures: 7});
+  assert.deepEqual(history[0], {hour: 0, arrivals: 8, departures: 6, netFlow: 2});
+  assert.deepEqual(history[1], {hour: 1, arrivals: 0, departures: 0, netFlow: 0});
+  assert.deepEqual(history[2], {hour: 2, arrivals: 0, departures: 7, netFlow: -7});
+});
+
+test("season history aggregates station flows into points exactly one week apart", () => {
+  const april = Array.from({length: 30}, () => []);
+  const may = Array.from({length: 31}, () => []);
+  april[0] = [[2, 1, 5], [1, 3, 2]];
+  april[6] = [[2, 1, 3]];
+  april[7] = [[1, 3, 4]];
+  may[0] = [[2, 1, 7]];
+
+  const history = seasonHistory(1, [{y: 2025, m: 5, d: may, h: []}, {y: 2025, m: 4, d: april, h: []}]);
+
+  assert.equal(history.length, 9);
+  assert.equal(history[0].date.toISOString(), "2025-04-01T00:00:00.000Z");
+  assert.equal(history[1].date.toISOString(), "2025-04-08T00:00:00.000Z");
+  assert.deepEqual({...history[0], date: undefined}, {date: undefined, arrivals: 8, departures: 2, netFlow: 6});
+  assert.deepEqual({...history[1], date: undefined}, {date: undefined, arrivals: 0, departures: 4, netFlow: -4});
+  assert.equal(history[4].arrivals, 7);
 });
