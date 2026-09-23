@@ -27,6 +27,7 @@ let weatherAnalysisPeriod = null;
 const weatherAnalysisRememberedMonths = new Map();
 let profileWeather = null;
 let profileWeatherContext = null;
+let stationProfileRequestId = 0;
 const MAX_FLOW_PARTICLES = 150;
 const PARTICLE_SPEED_METERS_PER_SECOND = 95;
 let flowParticles = [];
@@ -605,6 +606,7 @@ document.querySelector("#threshold").addEventListener("change", event => {
 document.querySelector("#clear").addEventListener("click", () => { selectedId = null; update(); });
 
 function hideStationProfile(restoreFocus = true) {
+  stationProfileRequestId += 1;
   const wasOpen = !document.querySelector("#station-profile").hidden;
   document.querySelector("#station-profile").hidden = true;
   document.querySelector("#station-profile-backdrop").hidden = true;
@@ -641,17 +643,21 @@ function renderStationFlowProfile(mode, history, weather = null) {
   StationProfile.renderFlowHistory(document.querySelector("#profile-daily-chart"), history, options);
 }
 
-async function loadSeasonHistory(year, stationId) {
+async function loadSeasonHistory(year, stationId, selectedMonth, selectedMonthData) {
   const key = `${year}-season:${stationId}`;
   if (stationProfileCache.has(key)) return stationProfileCache.get(key);
   const entries = [...availableMonths].filter(([value]) => value.startsWith(`${year}-`));
   const months = await Promise.all(entries.map(async ([value, file]) => {
-    if (value === monthKey(selectedDate)) return data;
-    const response = await fetch(`data/${file}`);
-    return response.ok ? response.json() : null;
+    if (value === selectedMonth) return selectedMonthData;
+    try {
+      const response = await fetch(`data/${file}`);
+      return response.ok ? await response.json() : null;
+    } catch (_) {
+      return null;
+    }
   }));
   const history = StationProfile.seasonHistory(stationId, months.filter(Boolean));
-  stationProfileCache.set(key, history);
+  if (months.every(Boolean)) stationProfileCache.set(key, history);
   return history;
 }
 
@@ -666,39 +672,47 @@ function stationProfileNavigate(mode, value) {
 
 async function showStationProfile() {
   if (selectedId === null || !data || !selectedDate) return;
+  const requestId = ++stationProfileRequestId;
+  const stationId = selectedId;
+  const date = new Date(selectedDate);
+  const selectedMonth = monthKey(date);
+  const selectedMonthData = data;
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  const summaryPeriod = periodText();
   hideRankings(false);
   hideInsights();
-  const key = `${monthKey(selectedDate)}:${selectedId}`;
-  if (!stationProfileCache.has(key)) stationProfileCache.set(key, StationProfile.monthlyHistory(selectedId, data));
-  const station = stationById.get(selectedId);
-  const mode = document.querySelector('input[name="mode"]:checked').value;
+  const key = `${selectedMonth}:${stationId}`;
+  if (!stationProfileCache.has(key)) stationProfileCache.set(key, StationProfile.monthlyHistory(stationId, selectedMonthData));
+  const station = stationById.get(stationId);
   const profileTuples = currentTuples();
   const profileStatistics = StationSummary.aggregateStationStatistics(STATIONS, profileTuples);
-  const stats = StationSummary.summaryFromStatistics(profileStatistics.get(selectedId));
+  const stats = StationSummary.summaryFromStatistics(profileStatistics.get(stationId));
   const rank = 1 + [...profileStatistics.values()].filter(item => item.trips > stats.trips).length;
   const directionalTotal = stats.arrivals + stats.departures;
   const arrivalsShare = directionalTotal ? stats.arrivals / directionalTotal * 100 : 0;
   const departuresShare = directionalTotal ? stats.departures / directionalTotal * 100 : 0;
   document.querySelector("#profile-station-name").textContent = station.name;
-  document.querySelector("#profile-month").textContent = mode === "month" ? `${selectedDate.getUTCFullYear()} season · weekly totals` : mode === "day" ? selectedDate.toLocaleDateString(undefined, {month: "long", year: "numeric", timeZone: "UTC"}) : selectedDate.toLocaleDateString(undefined, {weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC"});
+  document.querySelector("#profile-month").textContent = summaryPeriod;
   document.querySelector("#profile-summary").replaceChildren(...[
     `${stats.trips.toLocaleString()} trips · #${rank.toLocaleString()} busiest`,
     `${arrivalsShare.toLocaleString(undefined, {maximumFractionDigits: 1})}% arrivals · ${departuresShare.toLocaleString(undefined, {maximumFractionDigits: 1})}% departures`,
     `${stats.roundTripPercentage.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}% round trips`
   ].map(text => { const row = document.createElement("p"); row.textContent = text; return row; }));
-  const history = mode === "hour" ? StationProfile.dailyHistory(selectedId, data, selectedDate.getUTCDate())
+  const history = mode === "hour" ? StationProfile.dailyHistory(stationId, selectedMonthData, date.getUTCDate())
     : mode === "day" ? stationProfileCache.get(key).daily
-      : await loadSeasonHistory(selectedDate.getUTCFullYear(), selectedId);
+      : await loadSeasonHistory(date.getUTCFullYear(), stationId, selectedMonth, selectedMonthData);
+  if (requestId !== stationProfileRequestId || selectedId !== stationId || data !== selectedMonthData ||
+      selectedDate?.getTime() !== date.getTime() || document.querySelector('input[name="mode"]:checked').value !== mode) return;
   const weatherControl = document.querySelector("#profile-weather-control");
   weatherControl.hidden = mode === "month";
-  const context = `${selectedId}:${mode}:${selectedDate.toISOString()}`;
+  const context = `${stationId}:${mode}:${date.toISOString()}`;
   profileWeatherContext = context;
   profileWeather = null;
   renderStationFlowProfile(mode, history);
-  if (mode !== "month") loadWeather(selectedDate.getUTCFullYear()).then(payload => {
+  if (mode !== "month") loadWeather(date.getUTCFullYear()).then(payload => {
     if (profileWeatherContext !== context || !payload) return;
-    profileWeather = mode === "hour" ? Weather.hourlyWeatherForDay(payload, station.lon, selectedDate)
-      : Weather.dailyWeatherForMonth(payload, station.lon, selectedDate);
+    profileWeather = mode === "hour" ? Weather.hourlyWeatherForDay(payload, station.lon, date)
+      : Weather.dailyWeatherForMonth(payload, station.lon, date);
     renderStationFlowProfile(mode, history, profileWeather);
   });
   document.querySelector("#station-profile").hidden = false;
