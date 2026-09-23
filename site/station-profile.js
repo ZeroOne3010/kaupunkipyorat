@@ -42,8 +42,28 @@
         if (origin === stationId) item.departures += count;
         if (destination === stationId) item.arrivals += count;
       });
+      item.netFlow = item.arrivals - item.departures;
       return item;
     });
+  }
+
+  function seasonHistory(stationId, months) {
+    const days = months.slice().sort((a, b) => a.m - b.m).flatMap(month =>
+      monthlyHistory(stationId, month).daily.map(day => ({
+        ...day, date: new Date(Date.UTC(month.y, month.m - 1, day.day))
+      }))
+    );
+    if (!days.length) return [];
+    const first = days[0].date;
+    const weeks = [];
+    days.forEach(day => {
+      const index = Math.floor((day.date - first) / 604800000);
+      if (!weeks[index]) weeks[index] = {date: new Date(first.getTime() + index * 604800000), arrivals: 0, departures: 0, netFlow: 0};
+      weeks[index].arrivals += day.arrivals;
+      weeks[index].departures += day.departures;
+      weeks[index].netFlow += day.netFlow;
+    });
+    return weeks.filter(Boolean);
   }
 
   function svgElement(name, attributes = {}) {
@@ -128,16 +148,20 @@
       }
     }
     options.points.forEach((point, index) => {
-      const target = svgElement("rect", {x: left + index * groupWidth, y: top, width: groupWidth, height: innerHeight,
-        class: "chart-target", tabindex: "0", role: "button", "aria-label": point.tooltip});
+      const attributes = {x: left + index * groupWidth, y: top, width: groupWidth, height: innerHeight,
+        class: "chart-target", tabindex: "0", "aria-label": point.tooltip};
+      if (options.onSelect) attributes.role = "button";
+      const target = svgElement("rect", attributes);
       target.dataset.index = index;
       const title = svgElement("title"); title.textContent = point.tooltip; target.append(title);
       target.addEventListener("mouseenter", () => showTooltip(container, target, point.tooltip));
       target.addEventListener("focus", () => showTooltip(container, target, point.tooltip));
       target.addEventListener("mouseleave", () => hideTooltip(container));
       target.addEventListener("blur", () => hideTooltip(container));
-      target.addEventListener("click", () => options.onSelect(index));
-      target.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); options.onSelect(index); } });
+      if (options.onSelect) {
+        target.addEventListener("click", () => options.onSelect(index));
+        target.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); options.onSelect(index); } });
+      }
       svg.append(target);
     });
     options.ticks.forEach(([index, label]) => {
@@ -203,6 +227,25 @@
     }), ticks: [0, 4, 8, 12, 16, 20, 23].map(hour => [hour, String(hour).padStart(2, "0")]), onSelect});
   }
 
-  root.StationProfile = {monthlyHistory, dailyHistory, render, renderDay};
-  if (typeof module !== "undefined") module.exports = {monthlyHistory, dailyHistory};
+  function renderFlowHistory(container, history, options = {}) {
+    const count = value => value.toLocaleString(undefined, {maximumFractionDigits: 1});
+    const values = key => history.map(item => item[key]);
+    renderChart(container, {
+      label: options.label,
+      centered: true,
+      weather: options.weather,
+      series: [
+        {className: "arrivals", values: values("arrivals")},
+        {className: "departures", values: values("departures")},
+        {className: "net", values: values("netFlow")}
+      ],
+      points: history.map(item => ({tooltip: `${options.pointLabel(item)}\n${count(item.arrivals)} arrivals · ${count(item.departures)} departures\nNet ${item.netFlow > 0 ? "+" : ""}${count(item.netFlow)}`})),
+      ticks: options.ticks,
+      weekends: options.weekends || [],
+      onSelect: options.onSelect
+    });
+  }
+
+  root.StationProfile = {monthlyHistory, dailyHistory, seasonHistory, render, renderDay, renderFlowHistory};
+  if (typeof module !== "undefined") module.exports = {monthlyHistory, dailyHistory, seasonHistory};
 })(typeof globalThis !== "undefined" ? globalThis : this);
