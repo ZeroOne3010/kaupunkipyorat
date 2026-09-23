@@ -187,10 +187,11 @@ def primitive_edges(coordinates_e5):
 def build_exact_edges(records, diagnostics=None):
     """Collapse exact E5 primitive edges and add each route's weight once."""
     diagnostics = diagnostics if diagnostics is not None else {}
-    extraction_started = time.perf_counter()
     occurrences = zero_length = repeated = vertices = 0
-    extracted = []
+    extraction_seconds = aggregation_seconds = 0.0
+    aggregated = {}
     for record in records:
+        extraction_started = time.perf_counter()
         coordinates = record["coordinates_e5"]
         vertices += len(coordinates)
         occurrences += max(0, len(coordinates) - 1)
@@ -204,17 +205,18 @@ def build_exact_edges(records, diagnostics=None):
                 repeated += 1
             else:
                 route_edges.add(edge)
-        extracted.append((route_edges, int(record["weight"])))
-    extraction_seconds = time.perf_counter() - extraction_started
+        extraction_seconds += time.perf_counter() - extraction_started
 
-    aggregation_started = time.perf_counter()
-    aggregated = {}
-    for route_edges, weight in extracted:
+        # Aggregate a route immediately rather than retaining every route's set
+        # of edges.  This keeps peak memory proportional to the unique network,
+        # while the per-phase timers still distinguish extraction from updates.
+        aggregation_started = time.perf_counter()
+        weight = int(record["weight"])
         for edge in route_edges:
             entry = aggregated.setdefault(edge, {"edge": edge, "weight": 0, "route_count": 0})
             entry["weight"] += weight
             entry["route_count"] += 1
-    aggregation_seconds = time.perf_counter() - aggregation_started
+        aggregation_seconds += time.perf_counter() - aggregation_started
     edges = [aggregated[key] for key in sorted(aggregated)]
     diagnostics.update({
         "routed_od_geometries": len(records), "decoded_polyline_vertices": vertices,
@@ -223,7 +225,10 @@ def build_exact_edges(records, diagnostics=None):
         "exact_collapse_ratio": occurrences / len(edges) if edges else 0,
         "primitive_edge_extraction_seconds": extraction_seconds,
         "exact_edge_aggregation_seconds": aggregation_seconds,
-        "total_seasonal_trip_weight_represented": sum(edge["weight"] for edge in edges),
+        # Count each routed OD weight once here.  Summing edge weights instead
+        # measures weighted edge traversals and multiplies trips by route length.
+        "total_seasonal_trip_weight_represented": sum(int(record["weight"]) for record in records),
+        "weighted_primitive_edge_traversals": sum(edge["weight"] for edge in edges),
         "edge_trip_count_distribution": distribution([edge["weight"] for edge in edges]),
         "unique_edges_by_route_count": {
             "exactly_1": sum(edge["route_count"] == 1 for edge in edges),
@@ -463,6 +468,7 @@ def exact_edges_report(diagnostics, route_load_seconds):
         "Unique edges used by exactly 1 / 2+ / 5+ / 10+ / 50+ OD routes: " +
         " / ".join(f"{usage[key]:,}" for key in ("exactly_1", "2_plus", "5_plus", "10_plus", "50_plus")),
         f"Total seasonal trip weight represented: {diagnostics['total_seasonal_trip_weight_represented']:,}",
+        f"Weighted primitive-edge traversals: {diagnostics['weighted_primitive_edge_traversals']:,}",
         "Edge trip-count min / median / p90 / p95 / p99 / max: " +
         " / ".join(f"{weights[key]:,.1f}" for key in ("min", "median", "p90", "p95", "p99", "max")),
         "Phase timings (seconds): " + ", ".join([
