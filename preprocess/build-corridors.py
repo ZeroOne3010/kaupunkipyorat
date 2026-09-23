@@ -225,10 +225,12 @@ def build_exact_edges(records, diagnostics=None):
         "exact_collapse_ratio": occurrences / len(edges) if edges else 0,
         "primitive_edge_extraction_seconds": extraction_seconds,
         "exact_edge_aggregation_seconds": aggregation_seconds,
-        # Count each routed OD weight once here.  Summing edge weights instead
-        # measures weighted edge traversals and multiplies trips by route length.
+        # Count each routed OD weight once here. Summing the collapsed edge
+        # weights instead measures weighted unique route-edge memberships: an
+        # edge repeated within one route still contributes that route's weight
+        # only once, consistently with the exact-collapse semantics above.
         "total_seasonal_trip_weight_represented": sum(int(record["weight"]) for record in records),
-        "weighted_primitive_edge_traversals": sum(edge["weight"] for edge in edges),
+        "weighted_unique_route_edge_memberships": sum(edge["weight"] for edge in edges),
         "edge_trip_count_distribution": distribution([edge["weight"] for edge in edges]),
         "unique_edges_by_route_count": {
             "exactly_1": sum(edge["route_count"] == 1 for edge in edges),
@@ -468,7 +470,8 @@ def exact_edges_report(diagnostics, route_load_seconds):
         "Unique edges used by exactly 1 / 2+ / 5+ / 10+ / 50+ OD routes: " +
         " / ".join(f"{usage[key]:,}" for key in ("exactly_1", "2_plus", "5_plus", "10_plus", "50_plus")),
         f"Total seasonal trip weight represented: {diagnostics['total_seasonal_trip_weight_represented']:,}",
-        f"Weighted primitive-edge traversals: {diagnostics['weighted_primitive_edge_traversals']:,}",
+        "Weighted unique route-edge memberships: "
+        f"{diagnostics['weighted_unique_route_edge_memberships']:,}",
         "Edge trip-count min / median / p90 / p95 / p99 / max: " +
         " / ".join(f"{weights[key]:,.1f}" for key in ("min", "median", "p90", "p95", "p99", "max")),
         "Phase timings (seconds): " + ", ".join([

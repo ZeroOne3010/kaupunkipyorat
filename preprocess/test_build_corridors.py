@@ -59,6 +59,7 @@ class BuildCorridorsTests(unittest.TestCase):
         self.assertEqual(edges[0]["weight"], 9)
         self.assertEqual(edges[0]["route_count"], 1)
         self.assertEqual(diagnostics["repeated_edges_deduplicated"], 2)
+        self.assertEqual(diagnostics["weighted_unique_route_edge_memberships"], 9)
 
     def test_partially_shared_exact_edges_accumulate_correct_weights(self):
         diagnostics = {}
@@ -71,7 +72,7 @@ class BuildCorridorsTests(unittest.TestCase):
         self.assertEqual(edges, {((0, 0), (1, 0)): 4, ((1, 0), (2, 0)): 10,
                                  ((2, 0), (3, 1)): 6})
         self.assertEqual(diagnostics["total_seasonal_trip_weight_represented"], 10)
-        self.assertEqual(diagnostics["weighted_primitive_edge_traversals"], 20)
+        self.assertEqual(diagnostics["weighted_unique_route_edge_memberships"], 20)
 
     def test_zero_length_edges_are_skipped_and_reported(self):
         diagnostics = {}
