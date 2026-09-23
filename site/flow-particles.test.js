@@ -24,20 +24,30 @@ test("allocation does not fill the cap for very quiet periods", () => {
   assert.deepEqual(FlowParticles.allocateCounts([{count: 1}, {count: 4}], 150), [1, 2]);
 });
 
+test("random allocation gives every corridor a chance and caps the largest weight at ten times the smallest", () => {
+  const randomValues = [0, 1 / 16, 2 / 16, 6 / 16, 15 / 16];
+  const counts = FlowParticles.allocateRandomCounts(
+    [{count: 1}, {count: 25}, {count: 10000}],
+    randomValues.length,
+    () => randomValues.shift()
+  );
+  assert.deepEqual(counts, [1, 2, 2]);
+});
+
 test("particle positions are staggered and remain on their shared prepared path", () => {
-  const originalRandom = Math.random;
-  Math.random = () => 0.5;
-  const particles = FlowParticles.createParticles([{count: 20, coordinates: [[0, 0], [0.01, 0]]}], 4);
-  Math.random = originalRandom;
+  const particles = FlowParticles.createParticles(
+    [{count: 20, coordinates: [[0, 0], [0.01, 0]]}], 4, () => 0.5
+  );
   assert.equal(particles.length, 4);
   assert.equal(new Set(particles.map(particle => particle.path)).size, 1);
   assert.deepEqual(particles.map(particle => particle.distance / particle.path.totalLength), [0.125, 0.375, 0.625, 0.875]);
   assert.deepEqual(particles.map(particle => particle.direction), [1, 1, 1, 1]);
 });
 
-test("bidirectional flows alternate particle direction", () => {
+test("bidirectional particle signs are random", () => {
+  const randomValues = [0.25, 0.1, 0.75, 0.9, 0.25, 0.6, 0.75, 0.4, 0.25, 0.8, 0.75, 0.2];
   const particles = FlowParticles.createParticles([{
     count: 20, coordinates: [[0, 0], [0.01, 0]], bidirectional: true
-  }], 4);
+  }], 4, () => randomValues.shift());
   assert.deepEqual(particles.map(particle => particle.direction), [1, -1, 1, -1]);
 });
