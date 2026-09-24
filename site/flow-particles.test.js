@@ -51,3 +51,34 @@ test("bidirectional particle signs are random", () => {
   }], 4, () => randomValues.shift());
   assert.deepEqual(particles.map(particle => particle.direction), [1, -1, 1, -1]);
 });
+
+test("corridor particles draw a new weighted corridor and direction at each endpoint", () => {
+  const particles = FlowParticles.createParticles([
+    {count: 1, coordinates: [[0, 0], [0.001, 0]], bidirectional: true},
+    {count: 9, coordinates: [[1, 0], [1.002, 0]], bidirectional: true}
+  ], 1, () => 0);
+  const particle = particles[0];
+  const firstPath = particle.path;
+  particle.distance = firstPath.totalLength - 10;
+  particle.direction = 1;
+
+  const randomValues = [0.99, 0.75];
+  FlowParticles.advanceParticle(particle, 25, () => randomValues.shift());
+
+  assert.notEqual(particle.path, firstPath);
+  assert.equal(particle.direction, 1);
+  assert.equal(particle.distance, 15);
+});
+
+test("ordinary route particles continue looping on their original path", () => {
+  const particle = FlowParticles.createParticles([
+    {count: 1, coordinates: [[0, 0], [0.001, 0]]}
+  ], 1, () => 0)[0];
+  const originalPath = particle.path;
+  particle.distance = originalPath.totalLength - 5;
+
+  FlowParticles.advanceParticle(particle, 10, () => { throw new Error("should not redraw"); });
+
+  assert.equal(particle.path, originalPath);
+  assert.ok(Math.abs(particle.distance - 5) < 0.000001);
+});

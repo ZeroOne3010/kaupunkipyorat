@@ -263,7 +263,7 @@ function particleFrameData(timestamp) {
   if (!particleInteractionPaused) {
     const elapsed = particleLastTime === null ? 0 : Math.min(0.1, (timestamp - particleLastTime) / 1000);
     flowParticles.forEach(particle => {
-      particle.distance = (particle.distance + particle.direction * elapsed * PARTICLE_SPEED_METERS_PER_SECOND) % particle.path.totalLength;
+      FlowParticles.advanceParticle(particle, elapsed * PARTICLE_SPEED_METERS_PER_SECOND);
       FlowParticles.positionAt(particle.path, particle.distance, particle.feature.geometry.coordinates);
     });
     map.getSource("flow-particles")?.setData(particleFeatureCollection);
