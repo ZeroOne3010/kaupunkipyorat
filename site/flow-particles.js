@@ -81,6 +81,30 @@
     return counts;
   }
 
+  function createCorridorPool(flows) {
+    const eligible = flows.filter(flow => Math.max(0, flow.count || 0) > 0);
+    if (!eligible.length) return null;
+    const minimumWeight = Math.min(...eligible.map(flow => Math.sqrt(flow.count)));
+    let totalWeight = 0;
+    const entries = eligible.map(flow => {
+      totalWeight += Math.min(Math.sqrt(flow.count), minimumWeight * 10);
+      return {flow, cumulativeWeight: totalWeight};
+    });
+    return {entries, totalWeight};
+  }
+
+  function drawCorridor(pool, random) {
+    const target = random() * pool.totalWeight;
+    let low = 0;
+    let high = pool.entries.length - 1;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (target < pool.entries[middle].cumulativeWeight) high = middle;
+      else low = middle + 1;
+    }
+    return pool.entries[low].flow;
+  }
+
   function positionAt(path, distance, output) {
     const target = ((distance % path.totalLength) + path.totalLength) % path.totalLength;
     let low = 1;
@@ -110,17 +134,43 @@
     const allocation = corridorMode
       ? allocateRandomCounts(preparedFlows, cap, random)
       : allocateCounts(preparedFlows, cap);
+    const corridorPool = corridorMode ? createCorridorPool(preparedFlows) : null;
     const particles = [];
     preparedFlows.forEach((flow, flowIndex) => {
       const count = allocation[flowIndex];
       for (let index = 0; index < count; index += 1) {
         const distance = flow.path.totalLength * (index + random()) / count;
         const direction = flow.bidirectional && random() < 0.5 ? -1 : 1;
-        particles.push({path: flow.path, distance, direction});
+        particles.push({path: flow.path, distance, direction, corridorPool});
       }
     });
     return particles;
   }
 
-  return {allocateCounts, allocateRandomCounts, createParticles, distanceMeters, positionAt, preparePath};
+  function advanceParticle(particle, travelDistance, random = Math.random) {
+    if (!particle.corridorPool) {
+      particle.distance = (particle.distance + particle.direction * travelDistance) % particle.path.totalLength;
+      return particle;
+    }
+
+    let remaining = travelDistance;
+    while (remaining >= 0) {
+      const distanceToEnd = particle.direction > 0
+        ? particle.path.totalLength - particle.distance
+        : particle.distance;
+      if (remaining < distanceToEnd) {
+        particle.distance += particle.direction * remaining;
+        break;
+      }
+      remaining -= distanceToEnd;
+      const next = drawCorridor(particle.corridorPool, random);
+      particle.path = next.path;
+      particle.direction = random() < 0.5 ? -1 : 1;
+      particle.distance = particle.direction > 0 ? 0 : particle.path.totalLength;
+      if (remaining === 0) break;
+    }
+    return particle;
+  }
+
+  return {advanceParticle, allocateCounts, allocateRandomCounts, createParticles, distanceMeters, positionAt, preparePath};
 });
